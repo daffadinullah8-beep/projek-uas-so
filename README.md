@@ -1,3 +1,25 @@
+# Projek UAS Sistem Operasi : SteamOS dan Bazzite OS
+
+## Deskripsi
+Projek ini disusun untuk memenuhi Tugas Akhir Semester (UAS) pada mata kuliah Sistem Operasi. Fokus utama dari projek ini adalah.....
+
+## Cara Instalasi
+(akan diperbarui)
+
+## Cara Penggunaan
+
+(akan diperbarui)
+
+## Anggota Tim
+| No | Nama | Username GitHub | NPM | Peran |
+|:--:|---|---|:--:|---|
+| 1 | Daffa Dinullah | @daffadinullah8-beep | 257006111121 |  |
+| 2 | [Nama Anggota] | @ | [NPM] |  |
+| 3 | [Nama Anggota] | @[username] | [NPM] |  |
+| 4 | [Nama Anggota] | @[username] | [NPM] |  |
+| 5 | [Nama Anggota] | @[username] | [NPM] |  |
+| 6 | [Nama Anggota] | @[username] | [NPM] |  |
+
 # Lovelace — noterra
 
 Monitor hardware lokal (localhost) untuk mesin ini: backend FastAPI membaca
