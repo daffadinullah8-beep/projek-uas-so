@@ -1,173 +1,114 @@
-# AGENTS.md — Project UAS Sistem Operasi: Hardware-Specific Tuning + Monitoring App
+# AGENTS.md — Project UAS Sistem Operasi: Analisis Komparatif SteamOS vs Bazzite OS pada 2 Device
 
-Dokumen ini adalah konteks utama untuk agent lokal. Baca seluruhnya sebelum mengubah apa pun.
+Dokumen ini adalah panduan konteks utama untuk AI/agent lokal di workspace ini. Baca seluruh isi dokumen ini sebelum memberikan saran, skrip pengujian, atau pengubahan kode.
 
 ## 1. Tujuan
 
-Tuning Ubuntu 26.04 LTS yang khusus untuk satu mesin (bukan distro umum) agar inference LLM lokal (Strata + Qwen3.8 Flash Next) berjalan semaksimal mungkin, dengan suhu dan daya terkendali. Hasil akhir **tidak harus berupa ISO**: dosen mengizinkan tuning pada hardware sendiri. Deliverable utama adalah:
+Melakukan pengujian eksperimental dan analisis komparatif performa gaming antara **SteamOS** dan **Bazzite OS** yang dijalankan pada **2 perangkat (device) berbeda**.
 
-1. **Webapp monitoring** (localhost) sebagai alat ukur dan fondasi keputusan tweak.
-2. **Dokumentasi tweak level OS** (apa yang diubah, kenapa, bukti sebelum/sesudah).
+Proyek ini bertujuan untuk mengidentifikasi kelebihan, kekurangan, efesiensi resource, dan stabilitas dari kedua OS gaming berbasi linux tersebut. Deliverable utama proyek mencakup:
 
-Ini tugas UAS Sistem Operasi (solo), tugas terakhir semester.
+1. **Aplikasi Desktop Murni Noterra (Noterra Native Desktop App):** Pemantau hardware berbasis GUI desktop murni (standalone window tanpa browser) dengan backend FastAPI (`server.py`) yang membaca 5 metrik sistem secara *real-time* dan dapat mengekspor log pengujian.
+2. **Hasil Pengujian & Analisis Komparatif (Core Focus):** Data komparasi *head-to-head* pada 2 device untuk mengukur efisiensi 5 metrik utama, kestabilan FPS, konsumsi daya/TDP, efisiensi lapisan kompatibilitas Proton/DXVK, serta kelebihan & kekurangan fitur tiap OS.
+3. **Kelengkapan Luaran Akademik UAS:**
+  - Repositori GitHub (`daffadinullah8-beep/projek-uas-so`) berisi kode monitoring, log data pengujian, dan riset.
+  - Laporan Proyek PDF (10–20 halaman) Bab I–V lengkap dengan Tabel Kontribusi 6 Anggota Tim.
+  - Video Demo Pengujian (3–5 menit) dan Slide Presentasi Ujian.
 
-## 2. Aturan keras
+Ini merupakan tugas UAS Sistem Operasi.
 
-1. **Relevansi OS wajib.** Setiap tweak harus bisa dijelaskan dengan konsep OS (penjadwalan, manajemen memori/paging, I/O, power management/DVFS, interupsi, cgroup/isolasi). Dilarang sekadar mengganti config lalu mengklaim selesai.
-2. **Bukti sebelum dan sesudah.** Tidak ada tweak tanpa log baseline dan log setelah tweak (A/B, minimal 3 run per kondisi).
-3. **Setiap perubahan di-push ke GitHub** (dosen memantau progres lewat commit). Commit kecil, pesan jelas.
-4. **Jangan mengarang data.** Metrik yang tidak tersedia ditampilkan sebagai `unavailable`, bukan angka tebakan.
-5. **Jangan jalankan perintah yang mengubah sistem tanpa konfirmasi pengguna** (sysctl, governor, power limit, clock lock, kernel param, cgroup). Usulkan perintah dan rollback-nya, tunggu persetujuan.
-6. **Setiap tweak yang diterapkan wajib dicatat** di repo dokumentasi (lihat bagian 8).
+## 2. Aturan keras (Core Principles)
 
-## 3. Pembagian kerja
+1. **Target Akhir Aplikasi Desktop Murni:** Antarmuka Noterra wajib dibungkus/di-porting menjadi aplikasi desktop mandiri (menggunakan `pywebview` window atau native GUI `CustomTkinter`), bukan aplikasi yang dibuka manual lewat tab browser web.
+2. **Fokus pada 5 Metrik Utama:** Monitoring dan perekaman log wajib berfokus pada CPU, GPU, RAM, NVMe, dan Suhu (Temps).
+3. **Data Objektif & Zero Hallucination:** Pengujian wajib dilakukan secara fair (minimal 3 kali pengujian/run per game pada OS yang sama). Metrik hardware yang tidak terbaca oleh sensor/kernel WAJIB ditandai `unavailable`, dilarang mengarang angka.
+4. **Relevansi Konsep Sistem Operasi:** Seluruh temuan pengujian dari 5 metrik tersebut harus dianalisis menggunakan konsep OS (penjadwalan CPU, manajemen memori/swap, lapisan kompatibilitas Proton, immutable filesystem, dan power governor).
+5. **Isolasi Log Mentah:** Seluruh rekaman snapshot metrik (CSV/JSON) wajib disimpan di dalam folder `logs/` di repositori sebagai bukti otentik pengujian.
+6. **Overhead Rendah:** Aplikasi pemantau desktop tidak boleh membebani resource sistem sehingga mengganggu konsumsi FPS game yang diuji.
 
-- **Claude (chat):** prototype UI/UX webapp dan konsep.
-- **Agent lokal (kamu):** logic, collector, penyimpanan log, API, integrasi Strata, perbandingan log, penerapan UI prototype ke data nyata.
-- **Pengguna (Candra):** menjalankan tes di mesin, menyetujui tweak, push ke GitHub.
+## 3. Pembagian kerja & Peran Tim (6 Anggota)
+
+- **Daffa Dinullah (@daffadinullah8-beep) [NPM: 257006111121]:** Manajer Proyek, Lead Repository & Integrator Data Pengujian.
+- **Anggota 2 (@zid985401-cmd):** Penguji Hardware Device 1 (Eksekutor pengujian game di SteamOS vs Bazzite OS Perangkat A).
+- **Anggota 3:** Penguji Hardware Device 2 (Eksekutor pengujian game di SteamOS vs Bazzite OS Perangkat B).
+- **Anggota 4:** Pengembang Monitoring Tool (Penyesuaian backend/UI Noterra untuk pencatatan log metrik saat game berjalan).
+- **Anggota 5:** Penulis Laporan (Penyusun Laporan PDF Bab I–V, pembahasan kelebihan/kekurangan, & tabel kontribusi).
+- **Anggota 6:** Tim Media & Presentasi (Perekam/Editor Video Demo Pengujian & Penyusun Slide Presentasi).
+- **AI Agent (Kamu):** Pembuat skrip otomatisasi analisis data log, pembantu penyusun format laporan Markdown/PDF, serta penyesuai alat ukur Noterra.
 
 ## 4. Mesin dan lingkungan (fakta dari pengguna)
 
-- Laptop: Colorful EVOL P15 23 (Black), i7-13620H (Raptor Lake: P-core + E-core), RTX 4060 Mobile 8GB (Ada Lovelace)
-- RAM 2x16GB DDR5 5200MHz
-- Storage: WD PC SN540 512GB (root, ~94% penuh), ZHITAI TiPlus5000 1TB; swapfile 8GB
-- OS: Ubuntu 26.04.1 LTS, kernel 7.0.0-38, NVIDIA driver 595.99.02
-- Catatan termal: hanya 3 heatpipe, bottleneck ada di transport panas. Sebelumnya CPU turbo dimatikan dan GPU di-lock 2330MHz@850mV sebagai kompensasi
-- PCIe GPU: 4.0 x8 (jadi faktor saat cold run)
-- Engine: Strata 0.2.3.1 (build 0.1.48.1), mode low-RAM (mmap-experts)
-- Model: Swift 1.5 IQ2_XS (Qwen3.8-Flash-Next GGUF)
-- Perintah launch baseline:
-  `strata launch --model iq2_xs --family swift --context 128k --vision cpu --parallel 1 --tune quick --access lan --port 5128`
-- Folder kerja: `~/so-uas/logs/baseline`
+- **Device 1:** [Isi jenis device 1, misal: Handheld A / Laptop A]
+- **Device 2:** [Isi jenis device 2, misal: Handheld B / Laptop B]
+- **Sistem Operasi yang Diuji:** 
+  1. **SteamOS** (Arch-based, Gaming Mode Valve, Read-Only Filesystem)
+  2. **Bazzite OS** (Fedora Atomic/Silverblue-based, Cloud Native, Universal Blue)
+- **Monitoring Tools:** Aplikasi Desktop Noterra (`server.py` + Desktop GUI Client), Mangohud / Steam Performance Overlay (opsional pendamping).
+- **Lingkungan Pengembangan App:** Windows 10/11 (Mode Simulasi `?mock=1`) & Linux Native (Pengujian Asli).
 
-## 5. Baseline lama (referensi, bukan hasil app)
+## 5. Skenario & Protokol Pengujian Gaming
 
-- Prefill: cold ~50 tok/s, warm ~170 tok/s
-- Decode: cold ~10 tok/s, warm 30–40 tok/s
-- GPU 74–79°C, daya 50–60W, tidak pernah tembus 70W (diduga karena MoE)
-- Cold run lambat karena page-in: VRAM (via PCIe) dan NVMe aktif >1 GB/s memindahkan expert; saat warm keduanya turun dan tok/s naik stabil
-- Protokol tes: `drop_caches` → jalankan Strata → kirim prompt harness (cold) → kirim prompt sama dari workspace lain setelah read selesai (warm)
-- Generate proyek voxel sederhana di harness memakan ~1,5 jam (effort low), jadi tidak praktis untuk benchmark berulang. Gunakan prompt/workload yang lebih pendek dan terstandar untuk A/B.
+Pengujian dilakukan secara *head-to-head* pada *Device 1* dan *Device 2* untuk membandingkan karakteristik performa saat menjalankan game standar uji (1 game AAA dan 1 game esports/ringan).
 
-## 6. Webapp monitoring — spesifikasi
+- **Protokol Tes A/B:**
+  1. Boot OS (SteamOS / Bazzite OS) dalam kondisi *fresh boot*.
+  2. Jalankan **Aplikasi Desktop Noterra** di background untuk mulai merekam 5 metrik hardware utama.
+  3. Jalankan game target dengan preset grafis identik selama kurun waktu terstandar (10–15 menit per sesi).
+  4. Lakukan pengujian minimal 3 *run* per game/OS untuk mengambil rata-rata yang valid.
+  5. Bersihkan cache / *reboot* sebelum berpindah ke OS berikutnya.
 
-Berjalan di localhost. GUI minimalis, bersih, padat informasi. Referensi gaya: tab Monitor di engine Strata. Repo terpisah dan netral (teman akan fork untuk optimisasi game, jadi **jangan hardcode** Strata/LLM di core; buat sebagai plugin/adapter).
+## 6. Spesifikasi Noterra Desktop Application
 
-### 6.1 Metrik hardware (sampling ~1 detik, interval bisa diatur)
+Aplikasi desktop berjalan sebagai jendela mandiri yang mengambil data metrik dari backend FastAPI local (`http://127.0.0.1:5130`).
 
-- **CPU:** frekuensi, suhu, utilisasi per core (kelompokkan P vs E), daya RAPL, C-state residency, alasan throttle
-- **GPU:** suhu, daya, SM clock, mem clock, utilisasi, VRAM, throttle reasons (nvidia-smi / NVML), link PCIe gen/width
-- **PCIe:** throughput rx/tx
-- **NVMe:** MB/s baca/tulis, await, utilisasi, suhu, sisa kapasitas per disk
-- **Memori:** RAM, page cache, swap, major/minor page fault
-- **Kernel view:** context switch, migrasi thread, IRQ per core
-- **Sistem:** governor/EPP aktif, status turbo, power limit, kernel version, driver version
+### 6.1 5 Metrik Utama Hardware (Core Checked Metrics)
+1. **CPU:** Utilisasi total & per-core, frekuensi clock, daya (RAPL), dan status CPU throttle.
+2. **GPU:** Utilisasi GPU, SM clock, memory clock, konsumsi VRAM, dan daya GPU (Watt).
+3. **RAM:** Total penggunaan RAM, sisa kapasitas, alokasi memori game, serta pemakaian SWAP/ZRAM.
+4. **NVMe:** Kecepatan baca/tulis (*throughput* MB/s), I/O await, dan sisa kapasitas penyimpanan.
+5. **Temps (Suhu):** Pemantauan suhu *real-time* untuk CPU, GPU, dan NVMe guna mendeteksi kecenderungan *thermal throttling*.
 
-### 6.2 Metrik engine (adapter Strata)
+### 6.2 Fitur Pencatatan & Ekspor Desktop
+- **Sesi Pencatatan:** Tombol *Start/Stop Recording* pada GUI Desktop dengan rincian metadata: `[Nama Device] - [Nama OS] - [Judul Game] - [Sesi ke-N]`.
+- **Ekspor Otomatis:** Menyimpan log snapshot berformat CSV/JSON langsung ke folder `logs/`.
+- **Analisis Performa:** Menghitung suhu puncak (*peak temp*), rata-rata daya (Watt), kestabilan utilisasi CPU/GPU, serta kecepatan I/O NVMe.
 
-- Baca API Strata (tok/s prefill dan decode, slot, model termuat). Strata menyediakan HTTP API dan tab Monitor sendiri; **periksa dokumentasi Strata untuk endpoint yang benar**, jangan menebak.
-- Jika API tidak menyediakan sebuah metrik, tandai `unavailable`.
+## 7. Area Komparasi Sistem Operasi (Relevansi Konsep OS)
 
-### 6.3 Log dan analisis
+Setiap perbedaan performa pada 5 metrik utama wajib dianalisis berdasarkan konsep dasar Sistem Operasi:
 
-- **Rekam sesi** dengan label: nama konfigurasi, cold/warm, catatan bebas.
-- **Snapshot konfigurasi** otomatis saat sesi mulai: governor, EPP, turbo, power limit, clock lock GPU, sysctl terkait, kernel param, versi kernel/driver/Strata, argumen launch.
-- **Bandingkan sesi:** overlay grafik A/B, selisih konfigurasi (diff snapshot).
-- **Statistik:** rata-rata, median, p95, standar deviasi, agregasi dari beberapa run.
-- **Metrik turunan:** tok/s per watt, joule per token, waktu hingga warm, waktu di atas batas suhu.
-- **Deteksi bottleneck (rule-based, transparan):** misalnya PCIe/NVMe jenuh dengan GPU idle → page-bound; suhu mendekati batas dengan clock turun → thermal-bound. Tampilkan aturan yang terpicu, bukan hanya kesimpulan.
-- **Tab hipotesis:** tulis hipotesis → pilih tweak → jalankan A/B → tampilkan hasil. Ekspor sebagai bahan laporan.
-- **Ekspor:** CSV/JSON ke folder log di repo.
+- **Penjadwalan CPU & Gaming Mode:** Efisiensi penjadwal kernel (EEVDF/Bore) dan alokasi prioritas proses game (*GameMode* / `renice`).
+- **Lapisan Kompatibilitas GPU (Proton/Wine & DXVK/VKD3D):** Transmisi instruksi DirectX ke Vulkan, efisiensi prapemrosesan *shader cache*, dan konsumsi overhead GPU/CPU.
+- **Manajemen Memori (RAM) & File System (NVMe):** Arsitektur *Immutable Root Filesystem* (Btrfs dengan Ostree di Bazzite OS vs Arch-based read-only di SteamOS), penanganan *page cache*, efisiensi SWAP/ZRAM, serta waktu *loading* game dari NVMe.
+- **Power & Thermal Management (Temps):** Manajemen batas daya (TDP limit), governor CPU (`powersave` vs `performance`), penanganan interupsi, serta respon pengontrol suhu (fan curve/thermal daemon).
 
-### 6.4 Usulan teknis (terbuka, boleh diubah dengan alasan)
+## 8. Struktur Repositori & Penyimpanan Log
 
-- Backend Python (FastAPI), `psutil`, `pynvml`, pembacaan `/proc` dan `/sys`, `turbostat`/`perf` bila tersedia
-- Penyimpanan SQLite
-- Frontend ringan (grafik time-series seperti uPlot), tanpa framework berat
-- Dependensi minimal; tujuan utama: overhead monitoring rendah, karena app berjalan bersamaan dengan inference
+projek-uas-so/
+├── README.md              # Ringkasan hasil komparasi, identitas tim, & panduan app
+├── AGENTS.md              # Dokumen panduan AI lokal (file ini)
+├── app_desktop.py         # Entry point Aplikasi Desktop Murni (PyWebview / CustomTkinter)
+├── server/                # Backend Noterra (FastAPI + collector metrik)
+├── web/                   # Frontend antarmuka Noterra (Themes & CSS Desktop)
+├── tests/                 # Automated test suite (npm test / check-layout.mjs)
+├── logs/                  # Rekaman data mentah A/B testing (5 metrik utama)
+│   ├── device1-steamos/   # Log snapshot Device 1 (SteamOS)
+│   ├── device1-bazzite/   # Log snapshot Device 1 (Bazzite OS)
+│   ├── device2-steamos/   # Log snapshot Device 2 (SteamOS)
+│   └── device2-bazzite/   # Log snapshot Device 2 (Bazzite OS)
+└── docs/                  # Draft laporan PDF & slide presentasi
 
-### 6.5 Prinsip desain
+## 9. Alur Kerja Porting Desktop & Pengujian
 
-- Overhead rendah (jangan mengganggu pengukuran)
-- Data nyata saja; `unavailable` untuk yang tidak ada
-- UI mengikuti prototype dari Claude; tanyakan pengguna jika ada konflik dengan data nyata
+1. **Setup Environment & Web App:** Pastikan backend FastAPI (`server.py`) dan Web UI Noterra terverifikasi berjalan lancar di mode simulasi.
+2. **Kustomisasi Tema Desktop (`web/themes/`):** Terapkan tata letak antarmuka yang menampilkan panel CPU, GPU, RAM, NVMe, dan Temps secara jelas.
+3. **Porting ke Desktop App (`app_desktop.py`):** Integrasikan backend FastAPI dengan pembungkus GUI desktop mandiri (`pywebview` atau `CustomTkinter`).
+4. **Pengujian Gaming A/B:** Jalankan aplikasi desktop di *Device 1* & *Device 2* saat bermain game di SteamOS vs Bazzite OS, lalu simpan log snapshot ke `logs/`.
+5. **Penyusunan Laporan & Dokumentasi:** Olah data CSV/JSON 5 metrik utama menjadi grafik komparatif untuk Laporan PDF Bab IV dan bahan slide presentasi.
 
-## 7. Area tweak yang direncanakan (semua wajib punya relevansi OS)
+## 10. Hal-Hal yang Membutuhkan Konfirmasi Tim
 
-- **Penjadwalan CPU:** EEVDF di kernel 7.0, P/E core pinning (cpuset/cgroup v2), `SCHED_FIFO/RR` untuk thread decode, ukur migrasi thread dan latency (`perf sched`)
-- **Memori:** page cache, major fault, readahead, THP, `swappiness`, `vm.dirty_*`, `madvise`
-- **I/O:** I/O scheduler NVMe (`none` vs `mq-deadline`), queue depth, pola baca ke dua NVMe, layout file model
-- **Power management:** governor, EPP, `intel_pstate`, batas PL1/PL2 (RAPL), `thermald`, C/P-state
-- **Interupsi/driver:** IRQ affinity, interaksi nvidia-powerd/Dynamic Boost
-- **Isolasi:** Strata dalam cgroup v2 (`cpu.max`, `memory.high`, `io.max`)
-- **GPU:** kontrol terbatas (power limit, clock lock, mem clock, PCIe gen) lewat nvidia-smi; kontrol dikuasai driver NVIDIA
-
-Fokus UAS: P/E core pinning, titik ekuilibrium clock/power GPU, dan power governor sebagai batas akhir hardware.
-
-## 8. Struktur repo
-
-Dua repo terpisah:
-
-**Repo A — `perSOna` / Lovelace (webapp)**
-```
-perSOna/
-  README.md
-  server/        # collector, API, adapter (generik, tanpa asumsi LLM)
-    server.py
-    metrics_meta.json
-    requirements.txt
-    fixtures/
-    deploy/      # contoh unit systemd
-  web/           # frontend (client/widgets/shell + themes)
-  tests/         # smoke test jsdom
-  docs/          # arsitektur, fork, catatan
-  logs/          # sesi rekaman
-  changelog/
-```
-
-Catatan: struktur lama `monitor/core/` + `monitor/adapters/` diganti menjadi
-`server/` (backend) dan `web/` (frontend) supaya tidak ada dua folder `core/`.
-Adapter engine/game nanti masuk `server/adapters/`.
-
-**Repo B — `os-tuning-docs` (dokumentasi perubahan OS)**
-```
-os-tuning-docs/
-  README.md
-  baseline/      # log dan snapshot baseline
-  tweaks/        # satu file per tweak
-  results/       # log A/B, ringkasan
-  report/        # bahan laporan UAS
-```
-
-Template satu file tweak (`tweaks/NNN-nama.md`):
-
-```
-# NNN — Nama tweak
-- Tanggal:
-- Konsep OS terkait:
-- Hipotesis:
-- Perubahan (perintah persis):
-- Rollback (perintah persis):
-- Kondisi tes (cold/warm, prompt, jumlah run):
-- Hasil sebelum:
-- Hasil sesudah:
-- Kesimpulan (diterima / ditolak / perlu lanjut):
-- Link log:
-```
-
-Tweak yang ditolak tetap dicatat; itu juga bukti kerja.
-
-## 9. Alur kerja
-
-1. Bangun collector + log dulu (fondasi), lalu terapkan prototype UI ke data nyata.
-2. Ambil baseline lengkap (cold dan warm, ≥3 run) saat model berjalan.
-3. Dari data baseline, pilih tweak berdasarkan bottleneck yang terdeteksi.
-4. Satu tweak per iterasi: hipotesis → konfirmasi pengguna → terapkan → A/B → catat → commit/push → ulangi.
-5. Rangkum hasil untuk laporan.
-
-## 10. Hal yang belum diputuskan (tanyakan pengguna, jangan diasumsikan)
-
-- Nama repo dan lisensi
-- Stack final (usulan di 6.4 belum disetujui)
-- Workload standar untuk benchmark A/B (prompt pendek terstandar)
-- Apakah root disk (94% penuh) dibersihkan/dipindah sebelum baseline
+- Kepastian spesifikasi dan tipe **Device 1** dan **Device 2** yang digunakan.
+- Pemilihan 2–3 judul game standar yang akan diuji di kedua perangkat.
+- Anggota tim yang bertugas sebagai eksekutor pengujian di masing-masing device.
+- Pilihan teknologi porting desktop murni (`pywebview` vs `CustomTkinter`).
