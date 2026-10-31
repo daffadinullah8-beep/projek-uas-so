@@ -1,117 +1,136 @@
-# FORKING — bikin UI sendiri di noterra
+# FORKING & THEME DEVELOPMENT — Panduan UI Kustom Noterra (SteamOS / Bazzite OS)
 
-Panduan 1 halaman untuk fork (mis. optimisasi game). Tidak perlu menyentuh
-`shell.js`/`client.js` untuk kustomisasi biasa.
+Dokumen ini adalah panduan praktis untuk membuat antarmuka (UI theme) kustom pada Noterra yang disesuaikan dengan tema visual **SteamOS & Bazzite OS**. Kamu tidak perlu mengubah file JS inti (`shell.js` atau `client.js`) untuk kustomisasi visual biasa.
 
-## 0. Jalankan dulu
+## 0. Jalankan Environment Noterra
 
-```bash
-cd server
-.venv/bin/python server.py          # http://127.0.0.1:5130
+### Di Windows (PowerShell / Command Prompt):
+```powershell
+server\.venv\Scripts\python server\server.py
 ```
 
-Venv dibuat di `server/.venv` (lihat `server/requirements.txt`). Buka
-`http://127.0.0.1:5130/?mock=1` — data dari
-`server/fixtures/snapshot-sample.json`, tanpa hardware. Untuk mesin nyata buka
-tanpa `?mock=1`. UI yang diserve adalah `web/index.html`.
-
-## 1. Copy theme contoh
-
-```bash
-cp -r web/themes/minimal web/themes/game
+### Di Linux / SteamOS / Bazzite OS:
+```bash 
+server/.venv/bin/python server/server.py
 ```
 
-`minimal/` hanya berisi `theme.json`, `layout.json`, `theme.css` — **tanpa
-JavaScript**.
+Aplikasi dapat diakses via browser di http://127.0.0.1:5130/?mock=1 (menggunakan data simulasi dari server/fixtures/snapshot-sample.json). Untuk pengujian hardware nyata, buka tanpa parameter ?mock=1.
 
-## 2. Ganti nama theme
+## 1. Duplikasi Folder Tema Dasar
 
-`web/themes/game/theme.json`:
+Salin folder tema dasar minimal menjadi nama tema baru kelompokmu (misalnya steamos atau bazzite):
+```bash
+cp -r web/themes/minimal web/themes/steamos
+```
+
+Folder minimal/ berisi file theme.json, layout.json, dan theme.css tanpa dependensi JavaScript eksternal.
+
+## 2. Konfigurasi Identitas Tema (theme.json)
+
+Edit file web/themes/steamos/theme.json:
 
 ```json
-{"name":"game","author":"nama kamu","version":"1.0",
- "palettes":["light","dark"],"layout":"layout.json"}
+{
+  "name": "steamos",
+  "author": "Tim Projek UAS SO",
+  "version": "1.0",
+  "palettes": ["dark", "light"],
+  "layout": "layout.json"
+}
 ```
 
-Buka `http://127.0.0.1:5130/?theme=game&mock=1`.
+Uji tema baru kamu dengan mengakses `http://127.0.0.1:5130/?theme=steamos&mock=1`
 
-## 3. Atur layout (L2, tanpa JS)
+## 3. Atur Tata Letak Widget 5 Metrik Utama (layout.json)
 
-Edit `web/themes/game/layout.json`:
+Edit file web/themes/steamos/layout.json untuk menampilkan 5 metrik utama (CPU, GPU, RAM, NVMe, dan Temps):
 
 ```json
-{"cols":12,"gap":10,"items":[
-  {"widget":"value","bind":"cpuT","x":0,"y":0,"w":3,"h":1},
-  {"widget":"bar","bind":"cpuU","x":3,"y":0,"w":3,"h":1}
-]}
+{
+  "cols": 12,
+  "gap": 10,
+  "items": [
+    { "widget": "value", "bind": "cpuT", "x": 0, "y": 0, "w": 3, "h": 1 },
+    { "widget": "bar", "bind": "cpuU", "x": 3, "y": 0, "w": 3, "h": 1 },
+    { "widget": "value", "bind": "gpuT", "x": 6, "y": 0, "w": 3, "h": 1 },
+    { "widget": "bar", "bind": "gpuU", "x": 9, "y": 0, "w": 3, "h": 1 },
+    { "widget": "bar", "bind": "ramU", "x": 0, "y": 1, "w": 6, "h": 1 },
+    { "widget": "sparkline", "bind": "nvmeReadMbps", "x": 6, "y": 1, "w": 6, "h": 1 }
+  ]
+}
 ```
 
-- Widget siap pakai: `value`, `bar`, `sparkline`, `gauge`.
-- `bind` = key di `ctx.registry`/snapshot. Lihat key yang ada di
-  `http://127.0.0.1:5130/api/schema`.
-- `x,y` 0-based; `w,h` span; `cols` default 12.
-- Key/widget salah tidak bikin crash: muncul `unavailable` atau placeholder.
+- Tipe Widget Available: value, bar, sparkline, gauge.
+- Daftar Key Sensor: Buka `http://127.0.0.1:5130/api/schema` saat server berjalan untuk melihat daftar lengkap key bind.
+- Key atau widget yang salah tidak membuat aplikasi crash, melainkan akan menampilkan status `unavailable`.
 
 ## 4. Ganti warna (L1)
 
-Edit `web/themes/game/theme.css`:
+Edit variabel CSS pada `web/themes/steamos/theme.css` agar sesuai dengan palet warna SteamOS / Bazzite OS:
 
 ```css
-:root{--bg:#f7f8fa;--surface:#fff;--ink:#181b20;--a:#2563eb;--bad:#dc2626}
-[data-theme="dark"]{--bg:#111318;--surface:#191c22;--ink:#e8eaf0}
+:root {
+  --bg: #1a1f29;
+  --surface: #232a37;
+  --ink: #ffffff;
+  --a: #1a9fff; /* Accent Blue khas Steam */
+  --bad: #ff4d4d;
+}
+
+[data-theme="dark"] {
+  --bg: #0e141d;
+  --surface: #171d25;
+  --ink: #f3f3f3;
+}
 ```
 
-`core.css` sudah menyediakan fallback untuk tab Log dan widget; theme tidak
-wajib menulis semuanya.
+## 5. Menambahkan Skema Metrik Baru (metrics_meta.json)
 
-## 5. Tambah metrik (adapter/schema)
+Jika kelompokmu menambahkan metrik hardware baru (misalnya FPS Game):
 
-Core tidak punya daftar metrik hardware yang hardcoded. Untuk metrik baru
-(mis. FPS game):
-
-1. Tambahkan key ke JSON snapshot backend/adapter, mis. `"fps": 144.0`
-   (atau `null` kalau memang tidak ada — jangan mengarang angka).
-2. Tambahkan entri di `server/metrics_meta.json`:
+1. Tambahkan key pada return dict JSON backend FastAPI (`server/server.py`), misalnya "fps": 60.0.
+2. Daftarkan entri di `server/metrics_meta.json`:
 
 ```json
-"fps": {"label":"FPS","unit":"fps","digits":0,"source":"game adapter"}
+"fps": { "label": "FPS", "unit": "fps", "digits": 0, "source": "game overlay" }
 ```
 
-3. Restart server. Key otomatis masuk registry dengan label/satuan/skala itu;
-   pakai `{"widget":"value","bind":"fps"}` di layout.
-4. Metrik yang tidak tersedia tampil `unavailable` + alasan dari
-   `/api/health` (tambahkan alasan di collector bila perlu).
+3. Restart server backend. Key tersebut otomatis dapat di-bind di layout.json.
 
-## 6. Kalau butuh JS (L3)
+## 6. Kustomisasi JavaScript Lanjutan (L3 - Opsional)
 
-Buat `web/themes/game/overview.js`:
+Jika membutuhkan komponen JS khusus, buat file `web/themes/steamos/overview.js`:
+
+
 
 ```js
-window.Noterra.addTheme("game", {
-  mount(root, ctx){ root.innerHTML = "<div class='p'><h2>Game</h2></div>"; },
-  update(ctx){ /* baca ctx.data / ctx.registry / ctx.hist */ },
+window.Noterra.addTheme("steamos", {
+  mount(root, ctx) { 
+    root.innerHTML = "<div class='p'><h2>SteamOS Monitor</h2></div>"; 
+  },
+  update(ctx) { 
+    /* Akses data via ctx.data / ctx.registry */ 
+  }
 });
 ```
 
-Tambahkan `"entry":"overview.js"` ke `theme.json` (atau biarkan default).
-Theme hanya membaca `ctx`; jangan fetch/parse data sendiri.
+Tambahkan "entry": "overview.js" ke file `theme.json`.
 
-## 7. Headless (L4)
+## 7. Mode Headless (L4 - Opsional)
 
-Kalau ingin UI framework lain, pakai `web/core/client.js` saja — lihat
-`web/examples/headless.html`. Tidak ada DOM di client:
+Jika ingin membangun GUI desktop murni menggunakan framework lain (misalnya Electron atau Webview kustom), gunakan `web/core/client.js` langsung tanpa mengganggu DOM:
 
 ```js
 const N = window.Noterra, C = N.ctx;
-C.on("update", () => console.log(C.data.fps));
+C.on("update", () => console.log(C.data.cpuT, C.data.gpuT));
 N.loadSchema().then(() => N.start());
 ```
 
-## 8. Tes sebelum push
+## 8. Pengujian Otomatis Sebelum Commit
+
+Pastikan kustomisasi tema tidak memecahkan pengujian layout otomatis:
 
 ```bash
 cd tests
-npm test              # UI web/ + theme minimal + widget/layout
+npm test
 ```
-
-Jangan menambah dependency baru; jsdom dan `.venv` sudah tersedia.
