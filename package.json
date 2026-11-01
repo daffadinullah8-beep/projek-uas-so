@@ -1,0 +1,33 @@
+{
+  "name": "noterra-os",
+  "version": "1.0.0",
+  "description": "Noterra OS local telemetry desktop dashboard",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "id.noterra.os",
+    "productName": "Noterra OS",
+    "asar": false,
+    "files": [
+      "main.js",
+      "server/**/*",
+      "web/**/*",
+      "README.md",
+      "!server/.venv/**/*",
+      "!server/**/__pycache__/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

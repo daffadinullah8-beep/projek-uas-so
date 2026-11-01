@@ -45,6 +45,20 @@ Status pengujian UI: **Smoke Test UI: 100% ALL PASS (Default, Minimal, Neon Them
 Test memakai jsdom dan fixture/mock; test ini tidak menjalankan backend pada
 hardware nyata.
 
+### Aplikasi desktop Electron
+
+Setelah dependensi npm tersedia, jalankan dari root proyek:
+
+```bash
+npm start
+```
+
+Launcher menjalankan backend sebagai child process dan menutupnya saat jendela
+ditutup. Di Windows, dashboard dibuka dalam mode fixture (`?mock=1`) karena
+collector telemetry memakai sumber Linux (`/proc` dan `/sys`); di Linux,
+dashboard memakai telemetry live. Untuk membuat paket distribusi, jalankan
+`npm run dist`.
+
 ## Struktur Proyek
 
 ```text
