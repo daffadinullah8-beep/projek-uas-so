@@ -1,98 +1,71 @@
-# Projek UAS Sistem Operasi : SteamOS dan Bazzite OS
+# Noterra OS — Lovelace UI
 
-## Deskripsi
-Projek ini disusun untuk memenuhi Tugas Akhir Semester (UAS) pada mata kuliah Sistem Operasi. Fokus utama dari projek ini adalah.....
+Proyek UAS Sistem Operasi untuk memantau dan membandingkan performa sistem
+SteamOS dan Bazzite OS. Noterra mengumpulkan telemetry hardware dari sumber OS
+dan menampilkannya melalui dashboard web modular. Metrik tanpa sumber yang
+tersedia ditampilkan sebagai `unavailable`, bukan diisi dengan angka perkiraan.
 
-## Cara Instalasi
-(akan diperbarui)
+## Arsitektur
 
-## Cara Penggunaan
+- **Python FastAPI Telemetry Backend** — membaca metrik dari Linux `/proc`,
+  `/sys`, dan NVML; menyediakan snapshot, status ketersediaan metrik, serta
+  perekaman sesi ke CSV/JSON.
+- **Web UI Modular Dashboard** — frontend vanilla JavaScript dengan core data
+  client, shell navigasi, renderer widget/layout, dan pilihan theme.
+- **Themes** — `default` untuk dashboard monitor, `minimal` sebagai contoh
+  layout tanpa JavaScript, dan `neon` sebagai dashboard kustom.
 
-(akan diperbarui)
+## Quick Start Guide
 
-## Anggota Tim
-| No | Nama | Username GitHub | NPM | Peran |
-|:--:|---|---|:--:|---|
-| 1 | Daffa Dinullah | @daffadinullah8-beep | 257006111121 |  |
-| 2 | [Nama Anggota] | @ | [NPM] |  |
-| 3 | [Nama Anggota] | @[username] | [NPM] |  |
-| 4 | [Nama Anggota] | @[username] | [NPM] |  |
-| 5 | [Nama Anggota] | @[username] | [NPM] |  |
-| 6 | [Nama Anggota] | @[username] | [NPM] |  |
+### Backend
 
-# Lovelace — noterra
-
-Monitor hardware lokal (localhost) untuk mesin ini: backend FastAPI membaca
-`/proc`, `/sys`, dan NVML; frontend vanilla-JS menampilkan Overview + tab Log.
-Data yang tidak tersedia tetap `null` dan ditampilkan `unavailable` dengan
-alasan — tidak ada angka karangan.
-
-## Peta folder
-
-```
-perSOna/
-├── README.md
-├── .gitignore
-├── server/
-│   ├── server.py              # FastAPI + collector (port 5130)
-│   ├── metrics_meta.json      # schema metrik (label/satuan/sumber)
-│   ├── requirements.txt
-│   ├── README.md              # catatan backend (sumber metrik, unavailable)
-│   ├── fixtures/
-│   │   └── snapshot-sample.json
-│   └── deploy/
-│       └── noterra.service    # contoh unit systemd (tidak dijalankan di sini)
-├── web/
-│   ├── index.html             # shell UI
-│   ├── core/                  # client.js, widgets.js, shell.js, core.css
-│   ├── themes/                # default (L3) + minimal (L2, tanpa JS)
-│   ├── examples/headless.html # contoh L4
-│   └── THEMES.md
-├── tests/
-│   ├── package.json
-│   ├── test-web.mjs
-│   └── check-layout.mjs       # cek cepat widget komposit
-├── docs/
-│   ├── agents.md
-│   ├── blackbox.md
-│   ├── noterra-architecture.md
-│   ├── FORKING.md
-│   ├── refactor-notes.md
-│   └── prototype/overview_v6.html
-├── logs/                      # sesi rekaman (tidak diubah)
-└── changelog/
-```
-
-Folder backend lama sudah dihapus; nama produk "Noterra" tetap dipakai di UI/namespace
-(`window.Noterra`), hanya folder lama yang hilang.
-
-## Menjalankan
-
-Venv harus dibuat di `server/.venv` (lihat `server/requirements.txt`):
+Jalankan dari root repositori pada Linux:
 
 ```bash
-cd server
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python server.py          # http://127.0.0.1:5130
+python3 -m venv server/.venv
+server/.venv/bin/pip install -r server/requirements.txt
+python3 server/server.py
 ```
 
-Mode mock (tanpa hardware): buka `http://127.0.0.1:5130/?mock=1`.
-Diagnosis sumber metrik: `.venv/bin/python server.py --check`.
+Buka <http://127.0.0.1:5130>. Sebagian sensor mungkin memerlukan izin khusus;
+metrik yang tidak terbaca tetap ditandai `unavailable`. Untuk demo tanpa
+hardware, buka <http://127.0.0.1:5130/?mock=1>.
 
-## Test
+### Testing UI
+
+Dari direktori induk yang berisi folder `Lovelace`:
 
 ```bash
-cd tests
-npm test                 # node test-web.mjs (jsdom, fetch di-stub)
-node check-layout.mjs cpu-panel memory-panel storage-panel gpu-panel rail
+cd Lovelace/tests
+npm install
+node test-web.mjs
 ```
 
-Tidak perlu `npm install` lagi jika `tests/node_modules` ada. Test tidak
-menjalankan server dan tidak menyentuh hardware.
+Status pengujian UI: **Smoke Test UI: 100% ALL PASS (Default, Minimal, Neon Themes)**.
+Test memakai jsdom dan fixture/mock; test ini tidak menjalankan backend pada
+hardware nyata.
 
-## Fork UI
+## Struktur Proyek
 
-Mulai dari `web/themes/minimal/` (L2, tanpa JavaScript), edit `layout.json`.
-Panduan lengkap: [docs/FORKING.md](docs/FORKING.md); kontrak L1–L4:
-[web/THEMES.md](web/THEMES.md).
+```text
+server/       FastAPI telemetry collector, schema, fixture, dan deployment unit
+web/          shell, core client/widgets, dan themes
+tests/        smoke test UI dan pemeriksaan layout komposit
+docs/         panduan arsitektur, penggunaan, dan pengembangan
+```
+
+## Identitas Kelompok
+
+Lengkapi nama dan NIM anggota sebelum pengumpulan akhir.
+
+| No. | Nama | NIM | Peran |
+|:---:|---|---|---|
+| 1 | Nama Anggota 1 | NIM Anggota 1 | __________ |
+| 2 | Nama Anggota 2 | NIM Anggota 2 | __________ |
+| 3 | Nama Anggota 3 | NIM Anggota 3 | __________ |
+
+## Dokumentasi Lanjutan
+
+- Cara mengembangkan theme: [web/THEMES.md](web/THEMES.md)
+- Panduan backend dan sumber metrik: [server/README.md](server/README.md)
+- Catatan arsitektur dan rencana proyek: [docs/noterra-architecture.md](docs/noterra-architecture.md)

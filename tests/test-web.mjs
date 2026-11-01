@@ -91,6 +91,7 @@ ok([...N.registry.values()].filter(e => e.kind === "drive").length === base.driv
   `entri drive registry mengikuti /sys/block (${base.drives.length})`);
 ok(N.registry.get("gpuPresent")?.available === true, "gpuPresent tersedia dari snapshot");
 ok(d.querySelector("#status").textContent.includes("live"), "backend live setelah fetch pertama");
+ok(d.querySelector("#telemetry-mode")?.textContent === "[ LIVE TELEMETRY ]", "badge header menandai telemetry live");
 /* ---- dashboard desain baru ---- */
 const tlExpect = 1 + (base.snap.gpuPresent ? 4 : 0) + 1 + base.drives.length; // dipakai test ?layout=layout.json
 ok(d.querySelector(".dash"), "dashboard dirender");
@@ -207,6 +208,8 @@ ok(dm.querySelector(".w-gauge svg path.w-val")?.getAttribute("d"), "minimal: gau
 ok(dm.querySelector(".w-bar .w-caption")?.textContent.length > 0, "minimal: bar + caption");
 ok(dm.querySelector(".w-spark svg path")?.getAttribute("d"), "minimal: sparkline dari ring buffer");
 ok(dm.querySelector("#status").textContent.includes("mock"), "minimal: status mock (client.js + shell.js)");
+ok(dm.querySelector("#telemetry-mode")?.textContent === "[ DEMO MODE / OFFLINE PREVIEW ]",
+  "minimal: badge header menandai mode demo");
 mini.window.close();
 
 /* ---- theme neon L3 (Overview dari nol) di mode mock ---- */
@@ -225,6 +228,8 @@ ok(dn.querySelector("#nui-gpu-card") && !dn.querySelector("#nui-gpu-card").hidde
 ok(dn.querySelectorAll("#nui-drive-list .drive").length === 2, "neon: storage lanes mengikuti 2 drive");
 ok(dn.querySelector("#nui-trace path")?.getAttribute("d"), "neon: thermal trace dari ring buffer");
 ok(dn.querySelector("#nui-mem-big")?.textContent.includes("/"), "neon: memori big readout");
+ok(dn.querySelector("#telemetry-mode")?.textContent === "[ DEMO MODE / OFFLINE PREVIEW ]",
+  "neon: badge header menandai mode demo");
 neon.window.close();
 
 dom.window.close();

@@ -57,6 +57,24 @@
   border: 0;
 }
 
+.telemetry-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line, #d7dbe3);
+  border-radius: 999px;
+  color: var(--warn, #9a6700);
+  background: var(--surface, #fff);
+  font: 600 11px/1.2 var(--mono, monospace);
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.telemetry-mode[data-mode="live"] {
+  color: var(--ok, #16803c);
+}
+
 .btn {
   font: inherit;
   font-weight: 600;

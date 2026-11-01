@@ -92,15 +92,23 @@ async function loadTheme(){
 /* ---- navigasi: view registry (Log milik core, Overview dari addTheme) ---- */
 const VIEWS=new Map();            // id -> {id,label,order,mount,update}
 let activeView="overview";
+function updateTelemetryMode(){
+  const badge=$("#telemetry-mode"); if(!badge)return;
+  const live=!MOCK&&ctx.online;
+  badge.textContent=live?"[ LIVE TELEMETRY ]":"[ DEMO MODE / OFFLINE PREVIEW ]";
+  badge.dataset.mode=live?"live":"demo";
+}
 function renderNav(){
   const nav=$(DOM.nav); if(!nav)return;
   const vs=[...VIEWS.values()].sort((a,b)=>(a.order??100)-(b.order??100));
   nav.innerHTML=`<h1>Monitor</h1>
+  <span id="telemetry-mode" class="telemetry-mode" role="status" aria-live="polite"></span>
 ${vs.map(v=>`  <button data-p="${esc(v.id)}">${esc(v.label)}</button>`).join("\n")}
   <div class="foot"><label>UI <select id="ui"></select></label><label>Palette <select id="theme"></select></label><span id="status">Backend: offline</span></div>
 `;
   nav.querySelectorAll("button").forEach(b=>b.onclick=()=>show(b.dataset.p));
   populateUiSelect();
+  updateTelemetryMode();
 }
 function addView(id,v){
   VIEWS.set(id,{id,label:v.label||id,order:v.order??100,mount:v.mount,update:v.update});
@@ -348,6 +356,7 @@ addView("log",{label:"Log",order:10,mount(){renderLog();}});
 /* data update -> status + theme/view update; offline -> chips saja (perilaku lama) */
 ctx.on("update",()=>{
   $(DOM.status).textContent=MOCK?"Backend: mock":"Backend: live";
+  updateTelemetryMode();
   try{
     if(theme&&theme.update)theme.update(ctx);
     const v=VIEWS.get(activeView); if(v&&v.update)v.update(ctx);
@@ -355,11 +364,13 @@ ctx.on("update",()=>{
     /* perilaku lama: error render theme jatuh ke status offline + chips */
     N.markOffline();
     $(DOM.status).textContent=MOCK?"Backend: mock data gagal dimuat":"Backend: offline — run server.py";
+    updateTelemetryMode();
     refreshTheme();
   }
 });
 ctx.on("offline",()=>{
   $(DOM.status).textContent=MOCK?"Backend: mock data gagal dimuat":"Backend: offline — run server.py";
+  updateTelemetryMode();
   refreshTheme();
 });
 ctx.mk=mk;
