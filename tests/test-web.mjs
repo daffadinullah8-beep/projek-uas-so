@@ -165,14 +165,17 @@ ok(d.documentElement.getAttribute("data-theme") === "neon"
   "tombol Neon menerapkan atribut theme");
 ok(d.querySelector("#palette-neon-stylesheet")?.getAttribute("href") === "themes/neon/theme.css",
   "tombol Neon memuat stylesheet khusus Neon");
-ok(NEON_CSS.includes("--bg-primary:var(--bg)")
-  && NEON_CSS.includes("--card-bg:var(--surface)")
-  && NEON_CSS.includes("--border:rgba(34,211,238,.38)")
-  && NEON_CSS.includes("--text:var(--ink)"),
-  "stylesheet Neon menyediakan alias warna latar, panel, border, dan teks");
+ok(NEON_CSS.includes("--bg-primary:#0d0b18")
+  && NEON_CSS.includes("--card-bg:rgba(24,19,46,.85)")
+  && NEON_CSS.includes("--border:rgba(168,85,247,.3)")
+  && NEON_CSS.includes("--ink:#fff")
+  && NEON_CSS.includes("--mute:#a5b4fc"),
+  "stylesheet Neon memakai palet Synthwave Purple/Magenta");
 ok(NEON_CSS.includes(':root[data-theme="neon"] #root .dash > .card')
   && NEON_CSS.includes(':root[data-theme="neon"] #root .layout-host .w-value')
-  && NEON_CSS.includes("backdrop-filter:blur(12px)"),
+  && NEON_CSS.includes("backdrop-filter:blur(10px)")
+  && NEON_CSS.includes("linear-gradient(90deg,#3b82f6 0%,#ec4899 100%)")
+  && NEON_CSS.includes("linear-gradient(90deg,#6366f1,#a855f7)"),
   "kartu dashboard dan widget tetap memakai panel glassmorphism Neon");
 d.querySelector('.themesw [data-t="dark"]').click();
 ok(d.documentElement.getAttribute("data-theme") === "dark"
