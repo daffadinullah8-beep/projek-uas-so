@@ -21,14 +21,51 @@ resolusi tetap `unavailable` sampai integrasi VKD3D/DX12 disediakan.
 
 ## Quick Start Guide
 
-### Backend
+### Persyaratan
 
-Jalankan dari root repositori pada Linux:
+- Node.js dan npm untuk aplikasi desktop serta smoke test UI.
+- Python 3 untuk menjalankan backend.
+- Linux direkomendasikan untuk telemetry hardware aktual karena collector
+  membaca `/proc` dan `/sys`. Electron di Windows berjalan dalam mode demo.
+
+### Instalasi
+
+Jalankan dari root repositori:
+
+```bash
+npm install
+```
+
+Siapkan environment backend sesuai sistem operasi.
+
+Linux:
 
 ```bash
 python3 -m venv server/.venv
-server/.venv/bin/pip install -r server/requirements.txt
+server/.venv/bin/python -m pip install -r server/requirements.txt
+```
+
+Windows PowerShell:
+
+```powershell
+py -3 -m venv server\.venv
+server\.venv\Scripts\python.exe -m pip install -r server\requirements.txt
+```
+
+### Backend
+
+Jalankan backend dari root repositori.
+
+Linux:
+
+```bash
 python3 server/server.py
+```
+
+Windows PowerShell:
+
+```powershell
+server\.venv\Scripts\python.exe server\server.py
 ```
 
 Buka <http://127.0.0.1:5130>. Sebagian sensor mungkin memerlukan izin khusus;
@@ -45,13 +82,14 @@ npm install
 node test-web.mjs
 ```
 
+Atau jalankan `npm test` dari direktori `tests`.
 Status pengujian UI: **Smoke Test UI: 100% ALL PASS (Default, Minimal, Neon Themes)**.
 Test memakai jsdom dan fixture/mock; test ini tidak menjalankan backend pada
 hardware nyata.
 
 ### Aplikasi desktop Electron
 
-Setelah dependensi npm tersedia, jalankan dari root proyek:
+Setelah instalasi dependensi root selesai, jalankan dari root proyek:
 
 ```bash
 npm start
@@ -72,10 +110,18 @@ tests/        smoke test UI dan pemeriksaan layout komposit
 docs/         panduan arsitektur, penggunaan, dan pengembangan
 ```
 
-## Pengembang / Authors
+## Anggota Tim
 
-- Dapa
-- Repat
+Isi nama dan NIM setiap anggota kelompok sebelum pengumpulan.
+
+| No. | Nama | NIM |
+|:---:|---|---|
+| 1 | Nama Anggota 1 | NIM Anggota 1 |
+| 2 | Nama Anggota 2 | NIM Anggota 2 |
+| 3 | Nama Anggota 3 | NIM Anggota 3 |
+| 4 | Nama Anggota 4 | NIM Anggota 4 |
+| 5 | Nama Anggota 5 | NIM Anggota 5 |
+| 6 | Nama Anggota 6 | NIM Anggota 6 |
 
 ## Dokumentasi Lanjutan
 
