@@ -82,11 +82,11 @@ function startBackend(root) {
     windowsHide: true
   });
 
-  backend.stdout.on("data", data => console.log(`[noterra backend] ${data.toString().trimEnd()}`));
-  backend.stderr.on("data", data => console.error(`[noterra backend] ${data.toString().trimEnd()}`));
+  backend.stdout.on("data", (data) => console.log(`[Aether OS backend] ${data.toString().trimEnd()}`));
+  backend.stderr.on("data", data => console.error(`[Aether OS backend] ${data.toString().trimEnd()}`));
   backend.on("error", error => console.error("Gagal menjalankan Python backend:", error));
   backend.on("exit", (code, signal) => {
-    console.log(`Noterra backend berhenti (code=${code}, signal=${signal}).`);
+    console.log(`Aether OS backend berhenti (code=${code}, signal=${signal}).`);
     backend = null;
   });
   return backend;
@@ -148,6 +148,7 @@ function stopBackend() {
 
 async function createWindow(root) {
   const win = new BrowserWindow({
+    title: "Aether OS - Performance Monitor",
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -176,8 +177,8 @@ app.whenReady().then(async () => {
     await waitForBackend(child);
     await createWindow(root);
   } catch (error) {
-    console.error("Noterra desktop gagal dimulai:", error);
-    dialog.showErrorBox("Noterra OS", error.message);
+    console.error("Aether OS desktop gagal dimulai:", error);
+    dialog.showErrorBox("Aether OS", error.message);
     stopBackend();
     app.quit();
   }
@@ -196,8 +197,8 @@ app.on("activate", async () => {
     await waitForBackend(child);
     await createWindow(root);
   } catch (error) {
-    console.error("Noterra desktop gagal dibuka kembali:", error);
-    dialog.showErrorBox("Noterra OS", error.message);
+    console.error("Aether OS desktop gagal dibuka kembali:", error);
+    dialog.showErrorBox("Aether OS", error.message);
     stopBackend();
   }
 });

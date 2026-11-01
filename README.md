@@ -1,7 +1,7 @@
-# Noterra OS — Lovelace UI
+# Aether OS - Performance Monitor
 
 Proyek UAS Sistem Operasi untuk memantau dan membandingkan performa sistem
-SteamOS dan Bazzite OS. Noterra mengumpulkan telemetry hardware dari sumber OS
+SteamOS dan Bazzite OS. Aether OS mengumpulkan telemetry hardware dari sumber OS
 dan menampilkannya melalui dashboard web modular. Metrik tanpa sumber yang
 tersedia ditampilkan sebagai `unavailable`, bukan diisi dengan angka perkiraan.
 
@@ -37,10 +37,10 @@ hardware, buka <http://127.0.0.1:5130/?mock=1>.
 
 ### Testing UI
 
-Dari direktori induk yang berisi folder `Lovelace`:
+Dari root repositori:
 
 ```bash
-cd Lovelace/tests
+cd tests
 npm install
 node test-web.mjs
 ```
@@ -72,18 +72,12 @@ tests/        smoke test UI dan pemeriksaan layout komposit
 docs/         panduan arsitektur, penggunaan, dan pengembangan
 ```
 
-## Identitas Kelompok
+## Pengembang / Authors
 
-Lengkapi nama dan NIM anggota sebelum pengumpulan akhir.
-
-| No. | Nama | NIM | Peran |
-|:---:|---|---|---|
-| 1 | Nama Anggota 1 | NIM Anggota 1 | __________ |
-| 2 | Nama Anggota 2 | NIM Anggota 2 | __________ |
-| 3 | Nama Anggota 3 | NIM Anggota 3 | __________ |
+- Dapa
+- Repat
 
 ## Dokumentasi Lanjutan
 
 - Cara mengembangkan theme: [web/THEMES.md](web/THEMES.md)
 - Panduan backend dan sumber metrik: [server/README.md](server/README.md)
-- Catatan arsitektur dan rencana proyek: [docs/noterra-architecture.md](docs/noterra-architecture.md)

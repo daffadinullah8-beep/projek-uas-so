@@ -122,7 +122,7 @@ async function loadTheme(){
   sc.src="themes/"+encodeURIComponent(name)+"/"+entry;
   sc.onerror=()=>{$(DOM.status).textContent="Theme gagal dimuat";
     $(DOM.root).innerHTML=`<div class="empty">Theme "${esc(name)}" tidak ditemukan di themes/${esc(name)}/${esc(entry)}. Pasang theme hanya dari sumber yang dipercaya.</div>`;};
-  sc.onload=()=>{if(!theme)$(DOM.status).textContent=`Theme "${name}" tidak mendaftar lewat Noterra.addTheme`;};
+  sc.onload=()=>{if(!theme)$(DOM.status).textContent=`Theme "${name}" gagal mendaftar ke Aether OS`;};
   document.body.append(sc);
 }
 

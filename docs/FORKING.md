@@ -1,8 +1,8 @@
-# FORKING & THEME DEVELOPMENT — Panduan UI Kustom Noterra (SteamOS / Bazzite OS)
+# FORKING & THEME DEVELOPMENT — Panduan UI Kustom Aether OS (SteamOS / Bazzite OS)
 
-Dokumen ini adalah panduan praktis untuk membuat antarmuka (UI theme) kustom pada Noterra yang disesuaikan dengan tema visual **SteamOS & Bazzite OS**. Kamu tidak perlu mengubah file JS inti (`shell.js` atau `client.js`) untuk kustomisasi visual biasa.
+Dokumen ini adalah panduan praktis untuk membuat antarmuka (UI theme) kustom pada Aether OS yang disesuaikan dengan tema visual **SteamOS & Bazzite OS**. Kamu tidak perlu mengubah file JS inti (`shell.js` atau `client.js`) untuk kustomisasi visual biasa.
 
-## 0. Jalankan Environment Noterra
+## 0. Jalankan Environment Aether OS
 
 ### Di Windows (PowerShell / Command Prompt):
 ```powershell
@@ -32,7 +32,7 @@ Edit file web/themes/steamos/theme.json:
 ```json
 {
   "name": "steamos",
-  "author": "Tim Projek UAS SO",
+  "author": "Tim Aether OS - Kelompok 0 (Sistem Operasi)",
   "version": "1.0",
   "palettes": ["dark", "light"],
   "layout": "layout.json"

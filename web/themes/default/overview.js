@@ -719,7 +719,7 @@
         "w": 12,
         "h": 12,
         "props": {
-          "appTitle": "SteamOS vs Bazzite OS Monitor",
+          "appTitle": "Aether OS",
           "theme": "dark",
           "nav": {
             "overview": "Dashboard",
@@ -864,7 +864,7 @@
      jadi kulitnya dipasang dari theme: core tidak diubah. Select tetap ada di DOM
      (tersembunyi) agar pemilih UI/Palette core tetap berfungsi. */
   let PREVIEW = true;   // backend offline -> tampilkan angka contoh desain (props.offlinePreview=false untuk mematikan)
-  let APP_TITLE = "SteamOS vs Bazzite OS Monitor";
+  let APP_TITLE = "Aether OS";
   let NAV_LABELS = { overview: "Dashboard", log: "Session Manager", hud: "Live HUD Overlay" };
   let navObs = null;
   function ensureThemeSwitch() {

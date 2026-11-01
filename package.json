@@ -1,7 +1,12 @@
 {
-  "name": "noterra-os",
+  "name": "aether-os",
   "version": "1.0.0",
-  "description": "Noterra OS local telemetry desktop dashboard",
+  "description": "Aether OS local hardware performance monitor",
+  "author": "Daffa, Repat",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daffadinullah8-beep/projek-uas-so.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -12,8 +17,8 @@
     "electron-builder": "^26.18.0"
   },
   "build": {
-    "appId": "id.noterra.os",
-    "productName": "Noterra OS",
+    "appId": "id.aether.os",
+    "productName": "Aether OS",
     "asar": false,
     "files": [
       "main.js",

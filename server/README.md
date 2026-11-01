@@ -1,6 +1,6 @@
-# noterra — Monitor backend (Lovelace)
+# Aether OS — Performance Monitor Backend
 
-Webapp monitoring localhost untuk proyek UAS Sistem Operasi. Backend membaca
+Backend monitoring localhost untuk proyek UAS Sistem Operasi. Backend membaca
 status hardware nyata; tidak ada angka tebakan — metrik yang tidak punya
 sumber data dikembalikan `null` dan UI menampilkan **unavailable**.
 
