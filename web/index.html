@@ -32,6 +32,7 @@
     <span class="themesw" role="group" aria-label="Tema">
       <button type="button" data-t="light" aria-pressed="false">☀️ Light</button>
       <button type="button" data-t="dark" aria-pressed="true">🌙 Dark</button>
+      <button type="button" data-t="neon" aria-pressed="false">✨ Neon</button>
     </span>
   </div>
 </nav>
@@ -87,30 +88,5 @@
 <script src="core/client.js"></script>
 <script src="core/widgets.js"></script>
 <script src="core/shell.js"></script>
-<script>
-  /* Saklar Light/Dark. Dipasang di core (bukan di theme) sehingga overview.js
-     melewati ensureThemeSwitch(). Tetap sinkron dengan <select id="theme"> bila ada. */
-  (function () {
-    var root = document.documentElement, KEY = "noterra-theme";
-    var btns = [].slice.call(document.querySelectorAll(".themesw button"));
-    var cur = function () { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; };
-    var sync = function () { btns.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.t === cur())); }); };
-    btns.forEach(function (b) {
-      b.addEventListener("click", function () {
-        var t = b.dataset.t;
-        root.setAttribute("data-theme", t);
-        try { localStorage.setItem(KEY, t); } catch (e) {}
-        var sel = document.getElementById("theme");
-        if (sel) {
-          var o = [].slice.call(sel.options).filter(function (x) { return x.value.toLowerCase() === t; })[0];
-          if (o) { sel.value = o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-        }
-        sync();
-      });
-    });
-    new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-    sync();
-  })();
-</script>
 </body>
 </html>

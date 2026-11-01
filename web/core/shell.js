@@ -51,17 +51,52 @@ function populateUiSelect(){
   };
 }
 function initPalette(){
-  const pals=(themeMeta&&themeMeta.palettes)||["light","dark"];
-  let p=null; try{p=localStorage.getItem("nt.palette");}catch(e){}
+  const pals=[...new Set([...(themeMeta&&themeMeta.palettes||["light","dark"]),"neon"])];
+  let storedPalette=null;
+  try{storedPalette=localStorage.getItem("nt.palette")||localStorage.getItem("noterra-theme");}catch(e){}
+  let p=storedPalette;
   if(!p||pals.indexOf(p)<0){
     p=(window.matchMedia?window.matchMedia("(prefers-color-scheme:dark)").matches:false)?"dark":"light";
     if(pals.indexOf(p)<0)p=pals[0];
   }
   const th=$(DOM.theme);
   th.innerHTML=pals.map(x=>`<option value="${x}">${x[0].toUpperCase()+x.slice(1)}</option>`).join("");
-  th.value=p; document.documentElement.dataset.theme=p;
-  th.onchange=()=>{try{localStorage.setItem("nt.palette",th.value);}catch(e){}
-    document.documentElement.dataset.theme=th.value;};
+  th.value=p;
+  const applyPalette=value=>{
+    document.documentElement.dataset.theme=value;
+    try{
+      localStorage.setItem("nt.palette",value);
+      localStorage.setItem("noterra-theme",value);
+    }catch(e){}
+    let neonLink=$("#palette-neon-stylesheet");
+    if(value==="neon"&&themeName()!=="neon"){
+      if(!neonLink){
+        neonLink=document.createElement("link");
+        neonLink.id="palette-neon-stylesheet";
+        neonLink.rel="stylesheet";
+        document.head.append(neonLink);
+      }
+      neonLink.href="themes/neon/theme.css";
+    }else if(neonLink){
+      neonLink.remove();
+    }
+    document.querySelectorAll(".themesw [data-t]").forEach(button=>{
+      button.setAttribute("aria-pressed",String(button.dataset.t===value));
+    });
+  };
+  if(!storedPalette){
+    const initial=document.documentElement.dataset.theme;
+    if(pals.includes(initial))p=initial;
+    th.value=p;
+  }
+  th.onchange=()=>applyPalette(th.value);
+  document.querySelectorAll(".themesw [data-t]").forEach(button=>{
+    button.onclick=()=>{
+      th.value=button.dataset.t;
+      th.dispatchEvent(new Event("change",{bubbles:true}));
+    };
+  });
+  applyPalette(p);
 }
 async function loadTheme(){
   await N.loadSchema();
@@ -75,6 +110,7 @@ async function loadTheme(){
   const entry=(themeMeta&&themeMeta.entry)||"overview.js";
   const css=(themeMeta&&themeMeta.css)||"theme.css";
   const link=document.createElement("link");
+  link.id="ui-theme-stylesheet";
   link.rel="stylesheet"; link.href="themes/"+encodeURIComponent(name)+"/"+css;
   document.head.append(link);
   // theme tanpa script: overview langsung dari layout.json (L2)
@@ -161,6 +197,7 @@ function show(id){
   $(DOM.hud).hidden=!isHud;
   document.documentElement.classList.toggle("hud-active",isHud);
   document.body.classList.toggle("hud-active",isHud);
+  document.body.classList.toggle("session-active",id==="log");
   const nav=$(DOM.nav);
   if(nav)nav.hidden=isHud;
   renderNavState();

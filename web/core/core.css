@@ -79,6 +79,12 @@ main[hidden] {
   display: none !important;
 }
 
+#dashboard-view,
+#dashboard-view > #root {
+  min-width: 0;
+  min-height: 0;
+}
+
 .hud-back {
   align-self: flex-start;
   margin-bottom: auto;

@@ -12,6 +12,8 @@ const SHELL = readFileSync(path.join(PROJECT, "web", "index.html"), "utf8");
 const base = JSON.parse(readFileSync(path.join(PROJECT, "server", "fixtures", "snapshot-sample.json"), "utf8"));
 const SCHEMA = JSON.parse(readFileSync(path.join(PROJECT, "server", "metrics_meta.json"), "utf8"));
 const WEB = path.join(PROJECT, "web");
+const NEON_CSS = readFileSync(path.join(WEB, "themes", "neon", "theme.css"), "utf8");
+const CORE_CSS = readFileSync(path.join(WEB, "core", "core.css"), "utf8");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const fail = m => { console.error("FAIL:", m); process.exit(1); };
 const ok = (c, m) => { if (!c) fail(m); console.log("ok:", m); };
@@ -108,7 +110,7 @@ ok([...d.querySelectorAll(".dash .card")].every(c => !c.textContent.includes("un
 ok(d.querySelectorAll(".card.vs .item").length === 2, "Hardware Benchmark: 2 item");
 ok(d.querySelectorAll(".card.cmp .crow").length === 3, "Benchmark Game: 3 baris");
 ok(d.querySelector(".card.alt .subt")?.textContent.length > 0, "kartu NVMe: subjudul terisi");
-ok(d.querySelectorAll("#nav .themesw button").length === 2, "saklar Light/Dark terpasang");
+ok(d.querySelectorAll("#nav .themesw button").length === 3, "saklar Light/Dark/Neon terpasang");
 ok(!d.querySelector("#dashboard-view").hidden, "Dashboard view aktif secara default");
 d.querySelector("#btn-tab-hud").click();
 await sleep(80);
@@ -138,11 +140,36 @@ d.querySelector("#btn-tab-session").click();
 await sleep(80);
 ok(!d.querySelector("#session-manager-view").hidden && d.querySelector("#session-manager-view #rc"),
   "tab Session Manager menampilkan kontrol recording di view terpisah");
+ok(d.body.classList.contains("session-active")
+  && NEON_CSS.includes("body.session-active")
+  && NEON_CSS.includes("#session-manager-view .bar-top")
+  && NEON_CSS.includes("#session-manager-view .stack table"),
+  "layout Session Manager Neon mencegah ruang kosong, toolbar bertumpuk, dan tabel melebar");
 d.querySelector("#btn-tab-dashboard").click();
-ok(d.querySelector("#session-manager-view").hidden && !d.querySelector("#dashboard-view").hidden,
+ok(d.querySelector("#session-manager-view").hidden && !d.querySelector("#dashboard-view").hidden
+  && !d.body.classList.contains("session-active"),
   "navigasi kembali menyembunyikan Session Manager");
 ok(d.documentElement.getAttribute("data-theme") === "dark", "palette default = dark");
-ok(d.querySelector("#theme").options.length === 2, "palette light/dark dari theme.json");
+ok(d.querySelector("#theme").options.length === 3, "palette light/dark/Neon tersedia");
+d.querySelector('.themesw [data-t="neon"]').click();
+ok(d.documentElement.getAttribute("data-theme") === "neon"
+  && d.querySelector('.themesw [data-t="neon"]').getAttribute("aria-pressed") === "true",
+  "tombol Neon menerapkan atribut theme");
+ok(d.querySelector("#palette-neon-stylesheet")?.getAttribute("href") === "themes/neon/theme.css",
+  "tombol Neon memuat stylesheet khusus Neon");
+ok(NEON_CSS.includes("--bg-primary:var(--bg)")
+  && NEON_CSS.includes("--card-bg:var(--surface)")
+  && NEON_CSS.includes("--border:rgba(34,211,238,.38)")
+  && NEON_CSS.includes("--text:var(--ink)"),
+  "stylesheet Neon menyediakan alias warna latar, panel, border, dan teks");
+ok(NEON_CSS.includes(':root[data-theme="neon"] #root .dash > .card')
+  && NEON_CSS.includes(':root[data-theme="neon"] #root .layout-host .w-value')
+  && NEON_CSS.includes("backdrop-filter:blur(12px)"),
+  "kartu dashboard dan widget tetap memakai panel glassmorphism Neon");
+d.querySelector('.themesw [data-t="dark"]').click();
+ok(d.documentElement.getAttribute("data-theme") === "dark"
+  && !d.querySelector("#palette-neon-stylesheet"),
+  "memilih Dark mengembalikan palette dan melepas stylesheet tambahan Neon");
 ok([...d.querySelectorAll("#ui option")].map(o => o.value).sort().join(",") === "default,minimal,neon",
   "pemilih UI memuat theme dari /api/themes");
 ok(d.querySelector("#ui").value === "default", "pemilih UI menandai theme aktif");
@@ -268,6 +295,17 @@ ok(dn.querySelector("#nui-trace path")?.getAttribute("d"), "neon: thermal trace 
 ok(dn.querySelector("#nui-mem-big")?.textContent.includes("/"), "neon: memori big readout");
 ok(dn.querySelector("#telemetry-mode")?.textContent === "[ DEMO MODE / OFFLINE PREVIEW ]",
   "neon: badge header menandai mode demo");
+ok(NEON_CSS.includes(':root[data-theme="neon"] #dashboard-view:not([hidden])')
+  && NEON_CSS.includes("display:grid;")
+  && NEON_CSS.includes("min-height:calc(100vh - 120px);")
+  && NEON_CSS.includes("opacity:1;")
+  && CORE_CSS.includes("#dashboard-view > #root"),
+  "neon: dashboard view memakai grid, tinggi minimum, dan root tidak menyusut");
+ok(NEON_CSS.includes(':root[data-theme="neon"] #nav .foot')
+  && NEON_CSS.includes("flex-direction:row;")
+  && NEON_CSS.includes("flex-wrap:nowrap;")
+  && NEON_CSS.includes(':root[data-theme="neon"] #nav .themesw'),
+  "neon: theme switcher tetap sejajar di kanan header");
 neon.window.close();
 
 dom.window.close();
