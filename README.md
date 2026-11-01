@@ -112,16 +112,16 @@ docs/         panduan arsitektur, penggunaan, dan pengembangan
 
 ## Anggota Tim
 
-Isi nama dan NIM setiap anggota kelompok sebelum pengumpulan.
+Pembagian peran dapat dilengkapi sesuai kontribusi masing-masing anggota.
 
-| No. | Nama | NIM |
-|:---:|---|---|
-| 1 | Nama Anggota 1 | NIM Anggota 1 |
-| 2 | Nama Anggota 2 | NIM Anggota 2 |
-| 3 | Nama Anggota 3 | NIM Anggota 3 |
-| 4 | Nama Anggota 4 | NIM Anggota 4 |
-| 5 | Nama Anggota 5 | NIM Anggota 5 |
-| 6 | Nama Anggota 6 | NIM Anggota 6 |
+| No. | Nama | NPM | Peran |
+|:---:|---|:---:|---|
+| 1 | Daffa Dinullah | 257006111121 | |
+| 2 | Mochamad Syam Firza Ramadhan | 257006111122 | |
+| 3 | Rahman | 257006111073 | |
+| 4 | Reva Imelda | 257006111108 | |
+| 5 | Repat Dwi Gunanda | 257006111069 | |
+| 6 | Nadila Nuryadina | 257006111078 | |
 
 ## Dokumentasi Lanjutan
 
