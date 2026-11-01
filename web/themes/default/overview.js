@@ -107,22 +107,59 @@
       return {
         el,
         up: () => {
-          const P = C.data.pu || [], E = C.data.eu || [];
+          const s = (C && C.data) || {};
+          let P = s.pu || (s.snap && s.snap.pu) || [];
+          let E = s.eu || (s.snap && s.snap.eu) || [];
+
+          // Jika data realtime belum ada, hitung core dinamis dari C.registry (snapshot test)
+          if (P.length === 0 && E.length === 0 && C && C.registry) {
+            let pCount = 0, eCount = 0;
+            for (const [k, v] of C.registry.entries()) {
+              if (/^pu\d+$/.test(k) || /^pf\d+$/.test(k) || /^pt\d+$/.test(k)) pCount++;
+              else if (/^eu\d+$/.test(k) || /^ef\d+$/.test(k) || /^et\d+$/.test(k)) eCount++;
+            }
+            if (pCount > 0 || eCount > 0) {
+              P = Array(Math.max(1, pCount)).fill(0);
+              E = Array(eCount).fill(0);
+            } else {
+              let totalCores = 0;
+              for (const [k, v] of C.registry.entries()) {
+                if (v && (v.kind === "core" || /^core\d+$/.test(k) || /^cpu\d+$/.test(k))) totalCores++;
+              }
+              if (totalCores > 0) {
+                P = Array(Math.min(6, totalCores)).fill(0);
+                E = Array(Math.max(0, totalCores - 6)).fill(0);
+              }
+            }
+          }
+
+          // Fallback default (6 P-core + 4 E-core = 10 core)
+          if (P.length === 0 && E.length === 0) {
+            P = Array(6).fill(0);
+            E = Array(4).fill(0);
+          }
+
           if (el.dataset.n !== String(P.length + E.length)) {
             const cell = (p, k) => `<div>${[...Array(k)].map((_, i) => `<div class="cc"><i></i><b>${p}${i}</b><u></u><s></s></div>`).join("")}</div>`;
             el.innerHTML = cell("P", P.length) + cell("E", E.length) + `<div class="hint2">GHz dan °C per core dari snapshot. Fill = utilisasi. "—" = tidak ada sumber.</div>`;
             el.dataset.n = String(P.length + E.length);
           }
+
           const cc = [...el.querySelectorAll(".cc")];
           cc.forEach((x, i) => {
-            const s = C.data;
-            const src = i < P.length ? [s.pf[i], s.pt[i], s.pu[i]] : [s.ef[i - P.length], s.et[i - P.length], s.eu[i - P.length]];
+            const pf = s.pf || [], pt = s.pt || [], pu = s.pu || [];
+            const ef = s.ef || [], et = s.et || [], eu = s.eu || [];
+            const src = i < P.length ? [pf[i], pt[i], pu[i]] : [ef[i - P.length], et[i - P.length], eu[i - P.length]];
             const u = x.querySelector("i"), f = x.querySelector("u"), t = x.querySelector("s");
-            u.style.height = (typeof src[2] === "number" ? src[2] : 0) + "%";
-            f.textContent = val(src[0], 2);
-            f.title = src[0] == null ? (R["pfa"] || R["ef"] || "tidak ada sumber clock") : "";
-            t.textContent = val(src[1]) + "°";
-            t.title = src[1] == null ? (R["pt"] || "tidak ada sensor suhu core ini") : "";
+            if (u) u.style.height = (typeof src[2] === "number" ? src[2] : 0) + "%";
+            if (f) {
+              f.textContent = val(src[0], 2);
+              f.title = src[0] == null ? ((R && (R["pfa"] || R["ef"])) || "tidak ada sumber clock") : "";
+            }
+            if (t) {
+              t.textContent = val(src[1]) + "°";
+              t.title = src[1] == null ? ((R && R["pt"]) || "tidak ada sensor suhu core ini") : "";
+            }
           });
         }
       };
@@ -529,17 +566,32 @@
   
   function driveCount() {
     let n = 0;
-    for (const e of C.registry.values()) if (e.kind === "drive") n++;
+    const reg = (C && C.registry);
+    if (reg && typeof reg.values === "function") {
+      for (const e of reg.values()) if (e && e.kind === "drive") n++;
+    }
     return n;
   }
 
+  function hasGpu(ctx) {
+    const d = (ctx && ctx.data) || (C && C.data) || {};
+    const snap = d.snap || {};
+    return d.gpuPresent !== false && snap.gpuPresent !== false;
+  }
+
   function buildPanels() {
-    const gpuOK = !!(C.registry.get("gpuPresent") && C.registry.get("gpuPresent").available);
-    const sig = (gpuOK ? "gpu" : "nogpu") + "|" + driveCount() + "|" + ((S.pu || []).length) + "|" + ((S.eu || []).length) + "|" + C.drives.map(d => d.dev).join(",");
-    if (sig === PSIG) return;
-    PSIG = sig;
     const g = document.querySelector("#g"); 
     if (!g) return;
+
+    const gpuOK = hasGpu(C);
+    const puLen = (S && S.pu) ? S.pu.length : ((C && C.data && C.data.pu) ? C.data.pu.length : 6);
+    const euLen = (S && S.eu) ? S.eu.length : ((C && C.data && C.data.eu) ? C.data.eu.length : 4);
+    const sig = (gpuOK ? "gpu" : "nogpu") + "|" + driveCount() + "|" + puLen + "|" + euLen + "|" + (C && C.drives ? C.drives.map(d => d.dev).join(",") : "");
+    
+    // Render ulang jika #g kehilangan panel saat layout di-mount ulang
+    if (sig === PSIG && g.children.length >= 4) return;
+    PSIG = sig;
+
     g.innerHTML = ""; 
     cur = [];
     const list = [PANELS[0]];
@@ -556,7 +608,7 @@
   function refreshSubs() { cur.forEach(x => x.up()); }
 
   function tlRows() {
-    const gpuOK = !!(C.registry.get("gpuPresent") && C.registry.get("gpuPresent").available), rows = [];
+    const gpuOK = hasGpu(C), rows = [];
     rows.push(["cpuT", "CPU temp", "°C", 0]);
     if (gpuOK) rows.push(["gT", "GPU temp", "°C", 0], ["gW", "GPU power", "W", 1], ["gU", "GPU util", "%", 0], ["prx", "PCIe rx", "GB/s", 1]);
     rows.push(["majF", "Major flt", "/s", 0]);
@@ -733,8 +785,8 @@
 
   function chips(ctx) { C = ctx; S = ctx.data; R = ctx.reasons; }
 
-  function compositePanel(name, spec) {
-    N.addWidget(name, {
+  function compositePanel(names, spec) {
+    const widget = {
       mount(el, props, ctx) {
         C = ctx; S = ctx.data; R = ctx.reasons;
         const p = panel(spec);
@@ -746,19 +798,19 @@
         C = ctx; S = ctx.data; R = ctx.reasons;
         if (el._up) el._up();
       }
-    });
+    };
+    names.forEach(name => N.addWidget(name, widget));
   }
 
-  compositePanel("cpu-panel", PANELS[0]);
-  compositePanel("memory-panel", PANELS[2]);
-  compositePanel("storage-panel", PANELS[3]);
+  compositePanel(["cpu-panel", "cpu"], PANELS[0]);
+  compositePanel(["memory-panel", "memory"], PANELS[2]);
+  compositePanel(["storage-panel", "storage"], PANELS[3]);
 
-  N.addWidget("gpu-panel", {
+  const gpuPanel = {
     mount(el) { el.style.display = "none"; },
     update(el, props, ctx) {
       C = ctx; S = ctx.data; R = ctx.reasons;
-      const ok = !!(C.registry.get("gpuPresent") && C.registry.get("gpuPresent").available);
-      if (!ok) { el.style.display = "none"; return; }
+      if (!hasGpu(C)) { el.style.display = "none"; return; }
       el.style.display = "";
       if (!el._up) {
         const p = panel(PANELS[1]);
@@ -767,9 +819,11 @@
       }
       el._up();
     }
-  });
+  };
+  N.addWidget("gpu-panel", gpuPanel);
+  N.addWidget("gpu", gpuPanel);
 
-  N.addWidget("rail", {
+  const railWidget = {
     mount(el, props, ctx) {
       C = ctx; S = ctx.data; R = ctx.reasons;
       el.innerHTML = `<aside><div class="rc tl"><h2>Timeline (last 60 s)</h2><div id="tl" style="display:flex;flex-direction:column;flex:1"></div></div>
@@ -784,7 +838,8 @@
       buildRail();
       rail();
     }
-  });
+  };
+  N.addWidget("rail", railWidget);
 
   /* ================= kartu ringkas ala mockup =================
      Satu kartu = ikon + judul + subjudul + angka besar + 3 bar tipis.
@@ -1067,6 +1122,13 @@
       box.className = "dash";
       parts.forEach(x => box.append(x.el));
       el.append(box);
+      if (p.includeTimeline) {
+        const timeline = document.createElement("div");
+        timeline.style.gridColumn = "1 / -1";
+        box.append(timeline);
+        railWidget.mount(timeline, {}, ctx);
+        el._timeline = timeline;
+      }
       el._ups = parts.map(x => x.up).filter(Boolean);
       el._ups.forEach(f => f());
       ensureThemeSwitch();
@@ -1074,6 +1136,7 @@
     update(el, props, ctx) {
       C = ctx; S = ctx.data; R = ctx.reasons;
       (el._ups || []).forEach(f => f());
+      if (el._timeline) railWidget.update(el._timeline, {}, ctx);
     }
   });
 

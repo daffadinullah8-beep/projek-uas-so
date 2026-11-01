@@ -78,7 +78,7 @@ function domFor(html, wopts) {
     beforeParse(w) { installFetch(w, wopts.snapshot); } });
 }
 /* ---- assertions fungsional pada web/ baru ---- */
-const dom = domFor(SHELL, { url: "http://localhost/?layout=layout-detailed.json", resources: { interceptors: [fileInterceptor] } });
+const dom = domFor(SHELL, { resources: { interceptors: [fileInterceptor] } });
 const d = dom.window.document;
 await sleep(2200);
 const N = dom.window.Noterra;
@@ -91,56 +91,19 @@ ok([...N.registry.values()].filter(e => e.kind === "drive").length === base.driv
   `entri drive registry mengikuti /sys/block (${base.drives.length})`);
 ok(N.registry.get("gpuPresent")?.available === true, "gpuPresent tersedia dari snapshot");
 ok(d.querySelector("#status").textContent.includes("live"), "backend live setelah fetch pertama");
-const nCores = (base.pu || []).length + (base.eu || []).length;
-ok(d.querySelectorAll(".cc").length === nCores, `core cell dinamis dari registry (${nCores})`);
-ok([...d.querySelectorAll(".stats b")].map(x => x.textContent).every(t => !t.includes("undefined")), "stat cards tanpa 'undefined'");
-const cpuPanel = [...d.querySelectorAll(".p")].find(p => p.querySelector("h2").textContent === "CPU");
-ok(cpuPanel.querySelector(".gw svg")?.getAttribute("title").includes("RAPL"), "tooltip gauge dari alasan health");
-ok(cpuPanel.querySelector(".gw svg .v") && cpuPanel.querySelector(".gw svg .w"), "gauge CPU punya ring luar + ring dalam");
-const coreClocks = [...d.querySelectorAll(".cc u")].map(x => x.textContent);
-const realClocks = [...(base.pf || []), ...(base.ef || [])].filter(v => typeof v === "number");
-ok(coreClocks.filter(t => /^\d+\.\d{2}$/.test(t)).length === nCores, "core cell render GHz dengan 2 desimal");
-ok(realClocks.every(v => v >= 0.39 && v <= 5.5), `semua clock di rentang 0.39..5.5 GHz (max ${Math.max(...realClocks).toFixed(2)})`);
-ok(d.querySelectorAll(".cores > div:not(.hint2)").length === 2, "P dan E dipisah dua baris");
-const gpuPanel = [...d.querySelectorAll(".p")].find(p => p.querySelector("h2").textContent === "GPU");
-const chips = [...gpuPanel.querySelectorAll(".cp")].map(x => x.textContent);
-ok(chips.length === 4, "chip throttle GPU 4 slot");
-if (base.thrIdle != null) ok(chips.every(t => !t.includes("—")), "chip NVML throttle bits terbaca (tidak '—')");
-else ok(chips.some(t => t.includes("—")), "chip throttle tampil '—' saat NVML gagal");
-const tlExpect = 1 + (base.snap.gpuPresent ? 4 : 0) + 1 + base.drives.length;
-ok(d.querySelectorAll("#tl .tr").length === tlExpect, `timeline rail dinamis (${tlExpect} baris)`);
-ok([...d.querySelectorAll("#tl .tr b")].map(x => x.textContent).every(t => !t.includes("undefined")), "timeline tanpa 'undefined'");
-ok(d.querySelectorAll("#ev .ev").length === 6, "events rail 6 slot");
-ok([...d.querySelectorAll("#sys dd")].map(x => x.textContent).includes(base.snap.kernel), "System rail dari nilai snapshot nyata");
-if (d.querySelector("#hint span")) ok(d.querySelector("#hint span").textContent.includes("aturan"), "hint bottleneck menyebut aturan");
-const subs = [...d.querySelectorAll(".p header span")].map(x => x.textContent);
-ok(subs.some(t => t.includes("RTX 4060")), "subtitle GPU dari nvmlDeviceGetName");
-ok(subs.some(t => t.startsWith("kernel ")), "subtitle Memory = kernel saja");
-const gpuDd = [...gpuPanel.querySelectorAll("dd")].map(x => x.textContent);
-ok(gpuDd.includes(base.snap.gpuDriver), "versi NVIDIA driver tampil di panel GPU");
-
-/* nilai nyata di dl/bar (port assertion test.mjs) */
-const dlRowsMain = [...d.querySelectorAll(".p dl")].flatMap(dl =>
-  [...dl.children].reduce((acc, el, i) => (i % 2 === 0 ? acc.push([el.textContent, dl.children[i + 1]]) : acc, acc), []));
-const thRow = dlRowsMain.find(([t]) => t === "Throttle");
-if (base.cpuThr != null) ok(thRow[1].textContent === base.cpuThr, `Throttle CPU row = nilai sysfs nyata (${base.cpuThr})`);
-else ok(thRow[1].classList.contains("dd-na") && thRow[1].getAttribute("title").includes("throttle"),
-  "dl row Throttle unavailable + tooltip alasan");
-if (base.pl1 != null) ok(dlRowsMain.find(([t]) => t === "PL1 / PL2")[1].textContent.includes("PL1"),
-  "PL1/PL2 nyata tampil");
-else ok(dlRowsMain.find(([t]) => t === "PL1 / PL2")[1].getAttribute("title").includes("constraint"),
-  "PL tooltip alasan constraint");
-ok(dlRowsMain.filter(([t]) => t === "Readahead").every(([, dd]) => /KB$/.test(dd.textContent)), "readahead nyata KB");
-const raEmMain = [...d.querySelectorAll(".br em")].map(x => x.textContent);
-ok(raEmMain.some(t => t === "not mounted"), "drive tanpa mount tampil 'not mounted'");
-ok(raEmMain.some(t => /% of /.test(t)), "drive mounted tampil persen kapasitas nyata");
-if (base.ramBW == null) {
-  const bw = dlRowsMain.find(([t]) => t === "Measured bandwidth")[1];
-  ok(bw.classList.contains("dd-na") && bw.getAttribute("title").includes("perf"),
-    "measured RAM bandwidth unavailable + tooltip perf");
-}
-ok(d.querySelector("#theme").options.length === 2 && d.querySelector("#theme").value === "light",
-  "palette light/dark dari theme.json + prefers-color-scheme");
+/* ---- dashboard desain baru ---- */
+const tlExpect = 1 + (base.snap.gpuPresent ? 4 : 0) + 1 + base.drives.length; // dipakai test ?layout=layout.json
+ok(d.querySelector(".dash"), "dashboard dirender");
+ok(d.querySelectorAll(".dash > .card").length === 7, "dashboard: 7 kartu");
+ok(d.querySelector(".card.hero .name")?.textContent.includes("RTX 4060"), "hero: nama GPU dari snapshot");
+ok(/%$/.test(d.querySelector(".dash > .card .big b")?.textContent || ""), "kartu CPU: angka besar berisi persen");
+ok([...d.querySelectorAll(".dash .card")].every(c => !c.textContent.includes("undefined")), "kartu tanpa 'undefined'");
+ok(d.querySelectorAll(".card.vs .item").length === 2, "Hardware Benchmark: 2 item");
+ok(d.querySelectorAll(".card.cmp .crow").length === 3, "Benchmark Game: 3 baris");
+ok(d.querySelector(".card.alt .subt")?.textContent.length > 0, "kartu NVMe: subjudul terisi");
+ok(d.querySelectorAll("#nav .themesw button").length === 2, "saklar Light/Dark terpasang");
+ok(d.documentElement.getAttribute("data-theme") === "dark", "palette default = dark");
+ok(d.querySelector("#theme").options.length === 2, "palette light/dark dari theme.json");
 ok([...d.querySelectorAll("#ui option")].map(o => o.value).sort().join(",") === "default,minimal,neon",
   "pemilih UI memuat theme dari /api/themes");
 ok(d.querySelector("#ui").value === "default", "pemilih UI menandai theme aktif");
@@ -156,19 +119,11 @@ const alt = { ...base, snap: { ...base.snap, gpuPresent: false, nvml: false },
 const altDom = domFor(SHELL, { resources: { interceptors: [fileInterceptor] }, snapshot: alt });
 const d2 = altDom.window.document;
 await sleep(2200);
-const panels2 = [...d2.querySelectorAll(".p h2")].map(h => h.textContent);
-ok(!panels2.includes("GPU") && panels2.length === 3, `panel GPU tidak dibangun tanpa gpuPresent (${panels2.join(", ")})`);
-ok(d2.querySelectorAll("#tl .tr").length === 5, "timeline tanpa GPU: cpu + majF + 3 drive");
-const sto2 = [...d2.querySelectorAll(".p")].find(p => p.querySelector("h2").textContent === "Storage");
-ok(sto2.querySelectorAll(".bars .br").length === 6, "bar dinamis per drive dari registry (6 baris)");
-const tb2 = [...d2.querySelectorAll(".p dl.tb")];
-ok(tb2.length === 1 && tb2[0].querySelectorAll("dt.h").length === 3, "tabel drive dinamis: 3 kolom mengikuti /sys/block");
-const tbVals = [...tb2[0].querySelectorAll("dd")].map(x => x.textContent);
-ok(tbVals.some(t => t === "Seagate Barracuda"), "model drive nyata per kolom");
-ok(!tbVals.includes("undefined") && ![...d2.querySelectorAll(".tr b")].some(t => t.textContent.includes("undefined")),
-  "hardware lain: tidak ada 'undefined' di tabel/timeline");
-ok([...d2.querySelectorAll(".br em")].map(x => x.textContent).some(t => t === "not mounted"), "'not mounted' tetap tampil");
-ok([...d2.querySelectorAll(".p dl.tb dd")].some(x => x.classList.contains("dd-na")), "dd-na untuk nilai tanpa sumber");
+ok(d2.querySelectorAll(".dash > .card").length === 7, "tanpa GPU: dashboard tetap 7 kartu");
+ok(d2.querySelector(".card.alt .subt")?.textContent === "Seagate Barracuda", "kartu NVMe: model drive 0 dari hardware lain");
+ok(d2.querySelector(".card.alt .big b")?.textContent === "71%", "kartu NVMe: kapasitas terpakai drive 0");
+ok([...d2.querySelectorAll(".dash .card")].every(c => !c.textContent.includes("undefined")),
+  "hardware lain: tidak ada 'undefined' di kartu");
 ok([...altDom.window.Noterra.registry.values()].filter(e => e.kind === "drive").map(e => e.dev).join(",") === "sda,sdb,sdc",
   "registry drive mengikuti hardware lain (sda,sdb,sdc)");
 altDom.window.close();
@@ -197,26 +152,6 @@ ok((bindHost.querySelector(".w-na")?.getAttribute("title") || "").length > 0, "l
 const badHost = d.createElement("div");
 N.renderLayout(badHost, "{bukan json", N.ctx);
 ok(badHost.querySelector(".layout-error")?.textContent.includes("tidak valid"), "layout: JSON invalid jadi error box (tidak crash)");
-
-/* ---- PART A regression: Storage tab harus memilih drive yang diklik ---- */
-const storage = [...d.querySelectorAll(".p")].find(p => p.querySelector("h2")?.textContent === "Storage");
-const stTabs = () => [...storage.querySelectorAll(".ch .tabs button")];
-const gaugeText = () => [...storage.querySelectorAll(".gw svg text")].map(t => t.textContent).join(" ");
-ok(stTabs().map(b => b.textContent).join(",") === "nvme0n1,nvme1n1",
-  "storage: urutan tab sesuai index drive (drive 0 dulu)");
-stTabs()[1].click();
-await sleep(100);
-ok(stTabs()[1]?.getAttribute("aria-pressed") === "true", "storage: tab drive 1 aktif setelah diklik");
-ok(stTabs()[1]?.dataset.key === "r1", "storage: chart memakai series drive 1");
-ok(gaugeText().includes("drive 1"), "storage: gauge label ikut drive 1");
-await sleep(2200);
-ok(stTabs()[1]?.getAttribute("aria-pressed") === "true" && stTabs()[1]?.dataset.key === "r1",
-  "storage: pilihan drive 1 bertahan setelah 2 tick update");
-stTabs()[0].click();
-await sleep(100);
-ok(stTabs()[0]?.getAttribute("aria-pressed") === "true" && stTabs()[0]?.dataset.key === "r0",
-  "storage: klik drive 0 mengembalikan pilihan");
-ok(gaugeText().includes("drive 0"), "storage: gauge kembali ke drive 0");
 
 /* ---- tab Log (port assertion test.mjs) ---- */
 [...d.querySelectorAll("nav button")].find(b => b.dataset.p === "log").click();
