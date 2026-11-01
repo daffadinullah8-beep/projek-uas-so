@@ -18,6 +18,7 @@ Object.defineProperty(ctx,"recording",{get:()=>rec,configurable:true});
 /* ---- id DOM yang dipakai core; index.html wajib menyediakan empat pertama ---- */
 const DOM={
   nav:"#nav", status:"#status", theme:"#theme", ui:"#ui", root:"#root",
+  dashboard:"#dashboard-view", session:"#session-manager-view", hud:"#hud-overlay-view",
   iv:"#iv", lb:"#lb", tg:"#tg", tm:"#tm", mk:"#mk", rc:"#rc", ex:"#ex",
   asub:"#asub", an:"#an", mt:"#mt", tr:"#tr", gp:"#gp", ov:"#ov",
 };
@@ -100,15 +101,25 @@ function updateTelemetryMode(){
 }
 function renderNav(){
   const nav=$(DOM.nav); if(!nav)return;
-  const vs=[...VIEWS.values()].sort((a,b)=>(a.order??100)-(b.order??100));
-  nav.innerHTML=`<h1>Monitor</h1>
-  <span id="telemetry-mode" class="telemetry-mode" role="status" aria-live="polite"></span>
-${vs.map(v=>`  <button data-p="${esc(v.id)}">${esc(v.label)}</button>`).join("\n")}
-  <div class="foot"><label>UI <select id="ui"></select></label><label>Palette <select id="theme"></select></label><span id="status">Backend: offline</span></div>
-`;
-  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>show(b.dataset.p));
+  const tabs=[
+    ["btn-tab-dashboard","overview"],
+    ["btn-tab-session","log"],
+    ["btn-tab-hud","hud"]
+  ];
+  tabs.forEach(([buttonId,view])=>{
+    const button=document.getElementById(buttonId);
+    if(button)button.onclick=()=>show(view);
+  });
+  const back=document.getElementById("btn-back-dash");
+  if(back)back.onclick=()=>show("overview");
   populateUiSelect();
-  updateTelemetryMode();
+  renderNavState();
+}
+function renderNavState(){
+  const selected=activeView==="overview"?"overview":activeView==="log"?"log":"hud";
+  document.querySelectorAll("#nav .nav-pills [data-p]").forEach(button=>{
+    button.setAttribute("aria-current",String(button.dataset.p===selected));
+  });
 }
 function addView(id,v){
   VIEWS.set(id,{id,label:v.label||id,order:v.order??100,mount:v.mount,update:v.update});
@@ -144,10 +155,23 @@ function show(id){
   if(!VIEWS.has(id))id="overview";
   activeView=id;
   if(id!=="log")location.hash=id;
-  document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-current",b.dataset.p===id));
-  const root=$(DOM.root), v=VIEWS.get(id);
-  root.classList.remove("layout-host");
-  if(v&&v.mount)v.mount(root,ctx); else root.innerHTML="";
+  const isHud=id==="hud";
+  $(DOM.dashboard).hidden=id!=="overview";
+  $(DOM.session).hidden=id!=="log";
+  $(DOM.hud).hidden=!isHud;
+  document.documentElement.classList.toggle("hud-active",isHud);
+  document.body.classList.toggle("hud-active",isHud);
+  const nav=$(DOM.nav);
+  if(nav)nav.hidden=isHud;
+  renderNavState();
+  if(window.noterraDesktop&&window.noterraDesktop.setHudMode)
+    window.noterraDesktop.setHudMode(isHud);
+  const root=id==="log"?$(DOM.session):$(DOM.root), v=VIEWS.get(id);
+  if(!isHud){
+    root.classList.remove("layout-host");
+    if(v&&v.mount)v.mount(root,ctx); else root.innerHTML="";
+  }
+  if(isHud)updateHud(ctx);
 }
 
 /* ---- tab Log: sesi persisten di server, folder logs/<tanggal>_<label>/ ---- */
@@ -296,7 +320,7 @@ async function exportCsv(){
 }
 async function renderLog(){
   await loadSessions();
-  const root=$(DOM.root), r=!!rec;
+  const root=$(DOM.session), r=!!rec;
   const rows=SES.map(s=>`<tr><td><input type="checkbox" data-id="${s.id}" ${sel.has(s.id)?"checked":""} aria-label="Select ${esc(s.label)}"></td><td>${esc(s.label)}${s.status==="recording"?' <span class="tag">recording</span>':""}</td><td><span class="tag">${esc(s.tag||"none")}</span></td><td>${esc(s.started_iso||String(s.start_ms))}</td><td>${mmss(Math.round(s.samples*(s.interval_s||1)))}</td><td>${s.interval_s} s</td><td>${s.samples}</td><td>${(s.markers||[]).length}</td><td><button class="btn" data-del="${s.id}">Delete</button></td></tr>`).join("");
   root.innerHTML=`<div class="bar-top"><input id="lb" placeholder="Session label" size="22" value="${esc(lo.lb)}"><input id="tg" placeholder="Tag (groups repeated runs)" size="24" value="${esc(lo.tg)}">
     <label>Interval <select id="iv" ${r?"disabled":""}>${[.5,1,5].map(v=>`<option value="${v}" ${v===(r?rec.iv:lo.iv)?"selected":""}>${v} s</option>`).join("")}</select></label>
@@ -348,15 +372,89 @@ function overlay(svg,arrs,ivs){
   svg.innerHTML=keep.map(([a,i])=>`<path class="l" style="stroke:var(${COL[i%5]})" d="${a.map((v,j)=>`${j?"L":"M"}${(j*ivs[i]/D*200).toFixed(1)},${(58-(v-mn)/sp*56).toFixed(1)}`).join("")}"/>`).join("");
 }
 
+function updateHudValue(id,value,unit,digits=0,reasonText="Metrik tidak tersedia di backend."){
+  const element=document.getElementById(id);
+  if(!element)return;
+  if(typeof value==="number"&&Number.isFinite(value)){
+    element.textContent=`${value.toFixed(digits)}${unit}`;
+    element.removeAttribute("title");
+  }else{
+    element.textContent="unavailable";
+    element.title=reasonText;
+  }
+}
+function updateHud(ctx){
+  const data=ctx.data||{}, snap=ctx.snap||{};
+  const state=$("#hud-telemetry-state");
+  if(state)state.textContent=ctx.online&&!ctx.mock?"LIVE TELEMETRY":ctx.mock?"DEMO DATA":"OFFLINE";
+  const name=$("#hud-gpu-name");
+  if(name)name.textContent=snap.gpuName||(snap.gpuPresent===false?"GPU not detected":"GPU name unavailable");
+  updateHudValue("hud-gpu-util",data.gU,"%");
+  updateHudValue("hud-gpu-temp",data.gT," °C",1);
+  updateHudValue("hud-gpu-power",data.gW," W",1);
+  const vram=$("#hud-vram");
+  if(vram){
+    vram.textContent=typeof data.vram==="number"&&typeof data.vramTot==="number"
+      ?`${data.vram.toFixed(1)} / ${data.vramTot.toFixed(1)} GiB`:"unavailable";
+    if(vram.textContent==="unavailable")vram.title="Metrik VRAM tidak tersedia dari NVML.";
+    else vram.removeAttribute("title");
+  }
+  updateHudValue("hud-cpu-util",data.cpuU,"%",1);
+  updateHudValue("hud-cpu-temp",data.cpuT," °C",1);
+  const ram=$("#hud-ram");
+  if(ram){
+    ram.textContent=typeof data.ramU==="number"&&typeof data.memTot==="number"
+      ?`${data.ramU.toFixed(1)} / ${data.memTot.toFixed(1)} GiB`:"unavailable";
+    if(ram.textContent==="unavailable")ram.title="RAM usage atau kapasitas tidak tersedia.";
+    else ram.removeAttribute("title");
+  }
+
+  const gameMetrics=[
+    ["hud-fps","fps"],["hud-fps-avg","fpsAvg"],
+    ["hud-fps-1low","fps1Low"],["hud-fps-01low","fps01Low"]
+  ];
+  gameMetrics.forEach(([id,key])=>
+    updateHudValue(id,data[key]," FPS",1,"FPS game memerlukan integrasi VKD3D/DX12 yang belum tersedia."));
+  const resolution=$("#hud-resolution");
+  if(resolution){
+    resolution.textContent=typeof data.resolution==="string"&&data.resolution
+      ?data.resolution:"unavailable";
+    if(resolution.textContent==="unavailable")
+      resolution.title="Resolusi game tidak tersedia dari backend telemetry.";
+    else resolution.removeAttribute("title");
+  }
+  const frametimes=ctx.hist("frametimeMs")||[];
+  const frametime=$("#hud-frametime");
+  const path=$("#hud-frametime-chart path");
+  if(frametimes.length>1&&frametime&&path){
+    const min=Math.min(...frametimes),span=Math.max(...frametimes)-min||1;
+    path.setAttribute("d",frametimes.map((value,index)=>{
+      const x=index/(frametimes.length-1)*200;
+      const y=40-(value-min)/span*36;
+      return`${index?"L":"M"}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(""));
+    frametime.textContent=`${frametimes[frametimes.length-1].toFixed(2)} ms`;
+    frametime.removeAttribute("title");
+  }else{
+    if(path)path.setAttribute("d","");
+    if(frametime){
+      frametime.textContent="unavailable";
+      frametime.title="Frametime game memerlukan integrasi VKD3D/DX12 yang belum tersedia.";
+    }
+  }
+}
+
 /* shell memakai polling idempoten dari client */
 function start(){dataStart();}
 
 /* ---- titik masuk: daftar theme dari server, muat theme terpilih ---- */
 addView("log",{label:"Log",order:10,mount(){renderLog();}});
+addView("hud",{label:"Live HUD Overlay",order:20});
 /* data update -> status + theme/view update; offline -> chips saja (perilaku lama) */
 ctx.on("update",()=>{
   $(DOM.status).textContent=MOCK?"Backend: mock":"Backend: live";
   updateTelemetryMode();
+  updateHud(ctx);
   try{
     if(theme&&theme.update)theme.update(ctx);
     const v=VIEWS.get(activeView); if(v&&v.update)v.update(ctx);
@@ -371,6 +469,7 @@ ctx.on("update",()=>{
 ctx.on("offline",()=>{
   $(DOM.status).textContent=MOCK?"Backend: mock data gagal dimuat":"Backend: offline — run server.py";
   updateTelemetryMode();
+  updateHud(ctx);
   refreshTheme();
 });
 ctx.mk=mk;
@@ -392,5 +491,6 @@ Object.assign(N,{
   start:dataStart, addView,
   ctx, registry:REG, fmt:{fx,val,esc,mmss,clamp,avg}, mk, themeName, mock:MOCK,
 });
+renderNav();
 loadTheme();
 })();

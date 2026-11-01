@@ -11,9 +11,13 @@ tersedia ditampilkan sebagai `unavailable`, bukan diisi dengan angka perkiraan.
   `/sys`, dan NVML; menyediakan snapshot, status ketersediaan metrik, serta
   perekaman sesi ke CSV/JSON.
 - **Web UI Modular Dashboard** — frontend vanilla JavaScript dengan core data
-  client, shell navigasi, renderer widget/layout, dan pilihan theme.
+  client, shell navigasi, renderer widget/layout, dan tiga view: Dashboard,
+  Session Manager (recording/analisis/ekspor CSV), serta Live HUD Overlay.
 - **Themes** — `default` untuk dashboard monitor, `minimal` sebagai contoh
   layout tanpa JavaScript, dan `neon` sebagai dashboard kustom.
+
+HUD menampilkan metrik hardware yang tersedia. FPS game, frametime, dan
+resolusi tetap `unavailable` sampai integrasi VKD3D/DX12 disediakan.
 
 ## Quick Start Guide
 

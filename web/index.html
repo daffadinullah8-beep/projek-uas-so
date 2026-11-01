@@ -16,11 +16,13 @@
 </script>
 </head>
 <body>
-<!-- Top bar: nama app (kiri) · tab (tengah) · saklar Light/Dark (kanan) -->
+<!-- Top bar: brand, tiga view utama, dan saklar palette. -->
 <nav id="nav"><h1>SteamOS vs Bazzite OS Monitor</h1>
+  <span id="telemetry-mode" class="telemetry-mode" role="status" aria-live="polite">Connecting…</span>
   <div class="nav-pills">
-    <button data-p="overview">Dashboard</button>
-    <button data-p="log">In-Game</button>
+    <button id="btn-tab-dashboard" data-p="overview" aria-current="true">Dashboard</button>
+    <button id="btn-tab-session" data-p="log">Session Manager</button>
+    <button id="btn-tab-hud" data-p="hud">Live HUD Overlay</button>
   </div>
   <div class="foot">
     <!-- Dipertahankan di DOM karena diisi oleh shell.js, tapi disembunyikan secara visual. -->
@@ -33,7 +35,55 @@
     </span>
   </div>
 </nav>
-<main id="root"></main>
+<main id="dashboard-view"><div id="root"></div></main>
+<main id="session-manager-view" hidden></main>
+<main id="hud-overlay-view" hidden>
+  <button id="btn-back-dash" class="btn hud-back">Back to Dashboard</button>
+  <section class="hud-card" aria-label="Live game HUD">
+    <header class="hud-heading">
+      <div>
+        <p class="hud-eyebrow">NOTERRA · LIVE HUD</p>
+        <h2 id="hud-gpu-name">GPU unavailable</h2>
+      </div>
+      <span id="hud-telemetry-state" class="hud-state">Connecting…</span>
+    </header>
+    <div class="hud-section">
+      <h3>GPU</h3>
+      <div class="hud-metrics">
+        <div><span>Utilization</span><b id="hud-gpu-util">unavailable</b></div>
+        <div><span>Temperature</span><b id="hud-gpu-temp">unavailable</b></div>
+        <div><span>Power</span><b id="hud-gpu-power">unavailable</b></div>
+        <div><span>VRAM</span><b id="hud-vram">unavailable</b></div>
+      </div>
+    </div>
+    <div class="hud-section">
+      <h3>CPU &amp; Memory</h3>
+      <div class="hud-metrics">
+        <div><span>CPU utilization</span><b id="hud-cpu-util">unavailable</b></div>
+        <div><span>CPU temperature</span><b id="hud-cpu-temp">unavailable</b></div>
+        <div><span>RAM</span><b id="hud-ram">unavailable</b></div>
+      </div>
+    </div>
+    <div class="hud-section">
+      <h3>Game telemetry <small>VKD3D / DX12</small></h3>
+      <div class="hud-metrics hud-game-metrics">
+        <div><span>FPS</span><b id="hud-fps">unavailable</b></div>
+        <div><span>AVG</span><b id="hud-fps-avg">unavailable</b></div>
+        <div><span>1% low</span><b id="hud-fps-1low">unavailable</b></div>
+        <div><span>0.1% low</span><b id="hud-fps-01low">unavailable</b></div>
+        <div><span>Resolution</span><b id="hud-resolution">unavailable</b></div>
+      </div>
+      <div class="hud-frametime">
+        <span>Frametime</span>
+        <svg id="hud-frametime-chart" viewBox="0 0 200 44" role="img" aria-label="Frametime history">
+          <path></path>
+        </svg>
+        <b id="hud-frametime">unavailable</b>
+      </div>
+      <p class="hud-unavailable-note">FPS, frametime, dan resolusi game memerlukan integrasi game/overlay yang belum tersedia.</p>
+    </div>
+  </section>
+</main>
 <script src="core/client.js"></script>
 <script src="core/widgets.js"></script>
 <script src="core/shell.js"></script>

@@ -15,7 +15,8 @@
         "includeTimeline": true,
         "nav": {
           "overview": "Dashboard",
-          "log": "In-Game"
+          "log": "Session Manager",
+          "hud": "Live HUD Overlay"
         },
         "vs": {
           "title": "Performa Gaming Handheld (FPS & Suhu)",

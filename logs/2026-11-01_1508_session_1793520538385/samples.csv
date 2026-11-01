@@ -1,0 +1,1 @@
+cpu_temp_c,cpu_power_w,gpu_temp_c,gpu_power_w,vram_bw_gbs,pcie_rx_gbs,mem_major_faults_s,drive0_read_mbps

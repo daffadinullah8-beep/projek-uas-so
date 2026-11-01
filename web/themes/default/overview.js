@@ -723,7 +723,8 @@
           "theme": "dark",
           "nav": {
             "overview": "Dashboard",
-            "log": "In-Game"
+            "log": "Session Manager",
+            "hud": "Live HUD Overlay"
           },
           "vs": {
             "title": "Hardware Benchmark",
@@ -864,7 +865,7 @@
      (tersembunyi) agar pemilih UI/Palette core tetap berfungsi. */
   let PREVIEW = true;   // backend offline -> tampilkan angka contoh desain (props.offlinePreview=false untuk mematikan)
   let APP_TITLE = "SteamOS vs Bazzite OS Monitor";
-  let NAV_LABELS = { overview: "Dashboard", log: "In-Game" };
+  let NAV_LABELS = { overview: "Dashboard", log: "Session Manager", hud: "Live HUD Overlay" };
   let navObs = null;
   function ensureThemeSwitch() {
     const nav = document.getElementById("nav");
@@ -882,6 +883,10 @@
       });
       if (h1) h1.after(pills); else nav.prepend(pills);
     }
+    Object.entries(NAV_LABELS).forEach(([id, label]) => {
+      const button = nav.querySelector(`.nav-pills [data-p="${id}"]`);
+      if (button) button.textContent = label;
+    });
     const foot = nav.querySelector(".foot");
     if (foot) {
       foot.querySelectorAll("label, #status").forEach(x => x.classList.add("sr-only"));

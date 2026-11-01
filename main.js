@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const { execFileSync, spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
@@ -10,6 +10,13 @@ const APP_URL = process.platform === "win32" ? `${URL}?mock=1` : URL;
 
 let backend = null;
 let mainWindow = null;
+
+ipcMain.on("noterra:set-hud-mode", (event, enabled) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) return;
+  const isHud = enabled === true;
+  mainWindow.setAlwaysOnTop(isHud);
+  mainWindow.setBackgroundColor(isHud ? "#00000000" : "#121212");
+});
 
 function findProjectRoot() {
   const candidates = [
@@ -145,12 +152,17 @@ async function createWindow(root) {
     height: 800,
     minWidth: 900,
     minHeight: 600,
+    autoHideMenuBar: true,
+    transparent: true,
+    backgroundColor: "#121212",
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      preload: path.join(root, "preload.js")
     }
   });
   mainWindow = win;
+  win.setMenuBarVisibility(false);
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
   });

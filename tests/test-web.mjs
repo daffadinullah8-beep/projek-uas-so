@@ -5,11 +5,13 @@ import pkg from "jsdom";
 const { JSDOM, requestInterceptor } = pkg;
 import { readFileSync } from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
-const SHELL = readFileSync("../web/index.html", "utf8");
-const base = JSON.parse(readFileSync("../server/fixtures/snapshot-sample.json", "utf8"));
-const SCHEMA = JSON.parse(readFileSync("../server/metrics_meta.json", "utf8"));
-const WEB = path.resolve("../web");
+const PROJECT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SHELL = readFileSync(path.join(PROJECT, "web", "index.html"), "utf8");
+const base = JSON.parse(readFileSync(path.join(PROJECT, "server", "fixtures", "snapshot-sample.json"), "utf8"));
+const SCHEMA = JSON.parse(readFileSync(path.join(PROJECT, "server", "metrics_meta.json"), "utf8"));
+const WEB = path.join(PROJECT, "web");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const fail = m => { console.error("FAIL:", m); process.exit(1); };
 const ok = (c, m) => { if (!c) fail(m); console.log("ok:", m); };
@@ -92,6 +94,10 @@ ok([...N.registry.values()].filter(e => e.kind === "drive").length === base.driv
 ok(N.registry.get("gpuPresent")?.available === true, "gpuPresent tersedia dari snapshot");
 ok(d.querySelector("#status").textContent.includes("live"), "backend live setelah fetch pertama");
 ok(d.querySelector("#telemetry-mode")?.textContent === "[ LIVE TELEMETRY ]", "badge header menandai telemetry live");
+ok(d.querySelector("#btn-tab-dashboard")?.textContent === "Dashboard"
+  && d.querySelector("#btn-tab-session")?.textContent === "Session Manager"
+  && d.querySelector("#btn-tab-hud")?.textContent === "Live HUD Overlay",
+  "header menyediakan tiga tab utama terpisah");
 /* ---- dashboard desain baru ---- */
 const tlExpect = 1 + (base.snap.gpuPresent ? 4 : 0) + 1 + base.drives.length; // dipakai test ?layout=layout.json
 ok(d.querySelector(".dash"), "dashboard dirender");
@@ -103,6 +109,38 @@ ok(d.querySelectorAll(".card.vs .item").length === 2, "Hardware Benchmark: 2 ite
 ok(d.querySelectorAll(".card.cmp .crow").length === 3, "Benchmark Game: 3 baris");
 ok(d.querySelector(".card.alt .subt")?.textContent.length > 0, "kartu NVMe: subjudul terisi");
 ok(d.querySelectorAll("#nav .themesw button").length === 2, "saklar Light/Dark terpasang");
+ok(!d.querySelector("#dashboard-view").hidden, "Dashboard view aktif secara default");
+d.querySelector("#btn-tab-hud").click();
+await sleep(80);
+ok(d.querySelector("#hud-overlay-view") && !d.querySelector("#hud-overlay-view").hidden,
+  "tab HUD membuka view overlay");
+ok(d.querySelector("#nav").hidden && d.body.classList.contains("hud-active"),
+  "HUD menyembunyikan navigasi utama");
+ok(d.querySelector("#hud-gpu-util")?.textContent === `${N.ctx.data.gU}%`
+  && d.querySelector("#hud-gpu-temp")?.textContent === `${N.ctx.data.gT.toFixed(1)} °C`
+  && d.querySelector("#hud-gpu-power")?.textContent === `${N.ctx.data.gW.toFixed(1)} W`,
+  "HUD menampilkan metrik GPU dari snapshot live");
+const previousHudTemp = d.querySelector("#hud-gpu-temp").textContent;
+await sleep(1150);
+ok(d.querySelector("#hud-gpu-temp")?.textContent === `${N.ctx.data.gT.toFixed(1)} °C`
+  && d.querySelector("#hud-gpu-temp").textContent !== previousHudTemp,
+  "HUD tetap menerima update snapshot saat tab aktif");
+ok(d.querySelector("#hud-fps")?.textContent === "unavailable"
+  && d.querySelector("#hud-fps-1low")?.textContent === "unavailable",
+  "HUD tidak mengarang metrik FPS game yang belum tersedia");
+ok(d.documentElement.classList.contains("hud-active"), "HUD mengaktifkan latar transparan");
+d.querySelector("#btn-back-dash").click();
+ok(d.querySelector("#hud-overlay-view").hidden && !d.querySelector("#dashboard-view").hidden,
+  "tombol kembali mengaktifkan Dashboard dan menutup HUD");
+ok(!d.querySelector("#nav").hidden && !d.body.classList.contains("hud-active"),
+  "kembali ke Dashboard memulihkan navigasi utama");
+d.querySelector("#btn-tab-session").click();
+await sleep(80);
+ok(!d.querySelector("#session-manager-view").hidden && d.querySelector("#session-manager-view #rc"),
+  "tab Session Manager menampilkan kontrol recording di view terpisah");
+d.querySelector("#btn-tab-dashboard").click();
+ok(d.querySelector("#session-manager-view").hidden && !d.querySelector("#dashboard-view").hidden,
+  "navigasi kembali menyembunyikan Session Manager");
 ok(d.documentElement.getAttribute("data-theme") === "dark", "palette default = dark");
 ok(d.querySelector("#theme").options.length === 2, "palette light/dark dari theme.json");
 ok([...d.querySelectorAll("#ui option")].map(o => o.value).sort().join(",") === "default,minimal,neon",
