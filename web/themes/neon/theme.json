@@ -1,0 +1,7 @@
+{
+  "name": "neon",
+  "author": "noterra (brief #2)",
+  "version": "1.0",
+  "palettes": ["dark", "light"],
+  "description": "Mission-control: Overview neon dari nol — ring, trace termal, storage lanes."
+}

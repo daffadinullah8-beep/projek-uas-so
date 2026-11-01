@@ -109,6 +109,9 @@ Theme bisa mendaftarkan widget komposit sendiri (contoh:
 `themes/default/overview.js` → `cpu-panel`, `gpu-panel`, `memory-panel`,
 `storage-panel`, `rail`) lalu memakainya di `layout.json`.
 
+Contoh UI benar-benar baru dari nol: `themes/neon/overview.js` (mission-control:
+ring suhu, trace termal, storage lanes) — tidak memakai panel default.
+
 ### `ctx` (kontrak stabil)
 
 - `ctx.data` — nilai snapshot terkini (scalar, array `pu/pf/pt/eu/ef/et`,
@@ -164,12 +167,26 @@ Noterra.addView("log", {label:"Log", order:10, mount(root, ctx){...}, update(ctx
 - `overview` didaftarkan oleh `addTheme`; `log` didaftarkan shell.
 - Theme boleh override `log` dengan `addView("log", {...})`.
 
+## Memilih theme UI vs palette
+
+Nav sekarang punya dua kontrol terpisah:
+
+- **UI** (`#ui`) — memilih theme tampilan Overview (folder di `web/themes/`).
+  Mengubahnya menyimpan `localStorage["nt.theme"]`, menulis `?theme=<nama>`,
+  lalu reload.
+- **Palette** (`#theme`) — hanya warna Light/Dark, disimpan di
+  `localStorage["nt.palette"]`.
+
+Urutan pemilihan theme UI: `?theme=<nama>` > `localStorage["nt.theme"]` >
+`default`. `?layout=<file>` tetap bisa memaksa layout untuk theme tersebut.
+
 ## id DOM wajib dari `index.html`
 
-`#nav` (nav + tombol view + `#theme` + `#status`), `#root` (tempat view
-di-mount), `#theme` (select palette), `#status` (teks backend). Id tab Log
-(`#iv`, `#lb`, `#tg`, `#tm`, `#mk`, `#rc`, `#ex`, `#asub`, `#an`, `#mt`,
-`#tr`, `#gp`, `#ov`) dibuat shell saat tab Log dirender.
+`#nav` (nav + tombol view + `#ui` + `#theme` + `#status`), `#root` (tempat view
+di-mount), `#ui` (select theme UI), `#theme` (select palette), `#status` (teks
+backend). Id tab Log (`#iv`, `#lb`, `#tg`, `#tm`, `#mk`, `#rc`, `#ex`,
+`#asub`, `#an`, `#mt`, `#tr`, `#gp`, `#ov`) dibuat shell saat tab Log
+dirender.
 
 ## `core.css` — kelas & variabel fallback
 

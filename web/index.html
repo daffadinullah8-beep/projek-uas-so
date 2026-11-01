@@ -1,20 +1,66 @@
 <!doctype html>
-<html lang="en">
+<html lang="id" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monitor</title>
+<meta name="color-scheme" content="dark light">
+<title>SteamOS vs Bazzite OS Monitor</title>
+<!-- Font desain baru. Bila offline / tidak termuat, theme.css jatuh ke font sistem. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="core/core.css">
+<script>
+  /* Default dark; terapkan pilihan tersimpan sebelum render supaya tidak berkedip. */
+  try { var t = localStorage.getItem("noterra-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
 </head>
 <body>
-<nav id="nav"><h1>Monitor</h1>
-  <button data-p="overview">Overview</button>
-  <button data-p="log">Log</button>
-  <div class="foot"><label>Theme <select id="theme"></select></label><span id="status">Backend: offline</span></div>
+<!-- Top bar: nama app (kiri) · tab (tengah) · saklar Light/Dark (kanan) -->
+<nav id="nav"><h1>SteamOS vs Bazzite OS Monitor</h1>
+  <div class="nav-pills">
+    <button data-p="overview">Dashboard</button>
+    <button data-p="log">In-Game</button>
+  </div>
+  <div class="foot">
+    <!-- Dipertahankan di DOM karena diisi oleh shell.js, tapi disembunyikan secara visual. -->
+    <label class="sr-only">UI <select id="ui"></select></label>
+    <label class="sr-only">Palette <select id="theme"></select></label>
+    <span id="status" class="sr-only" role="status">Backend: offline</span>
+    <span class="themesw" role="group" aria-label="Tema">
+      <button type="button" data-t="light" aria-pressed="false">☀️ Light</button>
+      <button type="button" data-t="dark" aria-pressed="true">🌙 Dark</button>
+    </span>
+  </div>
 </nav>
 <main id="root"></main>
 <script src="core/client.js"></script>
 <script src="core/widgets.js"></script>
 <script src="core/shell.js"></script>
+<script>
+  /* Saklar Light/Dark. Dipasang di core (bukan di theme) sehingga overview.js
+     melewati ensureThemeSwitch(). Tetap sinkron dengan <select id="theme"> bila ada. */
+  (function () {
+    var root = document.documentElement, KEY = "noterra-theme";
+    var btns = [].slice.call(document.querySelectorAll(".themesw button"));
+    var cur = function () { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; };
+    var sync = function () { btns.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.t === cur())); }); };
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = b.dataset.t;
+        root.setAttribute("data-theme", t);
+        try { localStorage.setItem(KEY, t); } catch (e) {}
+        var sel = document.getElementById("theme");
+        if (sel) {
+          var o = [].slice.call(sel.options).filter(function (x) { return x.value.toLowerCase() === t; })[0];
+          if (o) { sel.value = o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+        sync();
+      });
+    });
+    new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    sync();
+  })();
+</script>
 </body>
 </html>

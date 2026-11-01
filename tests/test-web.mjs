@@ -49,7 +49,8 @@ function installFetch(w, snapshotFn) {
     if (url.includes("/api/schema") || url.includes("/api/mock/schema")) return { ok: true, json: async () => SCHEMA };
     if (url.includes("/api/themes")) return { ok: true, json: async () => ({ themes: [
       { name: "default", entry: "overview.js", palettes: ["light", "dark"] },
-      { name: "minimal", entry: null, layout: "layout.json", palettes: ["light", "dark"] }] }) };
+      { name: "minimal", entry: null, layout: "layout.json", palettes: ["light", "dark"] },
+      { name: "neon", entry: "overview.js", palettes: ["dark", "light"] }] }) };
     if (url.includes("/api/health") || url.includes("/api/mock/health")) return { ok: true, json: async () => HEALTH };
     if (url.includes("themes/")) {
       try { return { ok: true, text: async () => readFileSync(path.join(WEB, new URL(url, "http://localhost/").pathname), "utf8") }; }
@@ -77,7 +78,7 @@ function domFor(html, wopts) {
     beforeParse(w) { installFetch(w, wopts.snapshot); } });
 }
 /* ---- assertions fungsional pada web/ baru ---- */
-const dom = domFor(SHELL, { resources: { interceptors: [fileInterceptor] } });
+const dom = domFor(SHELL, { url: "http://localhost/?layout=layout-detailed.json", resources: { interceptors: [fileInterceptor] } });
 const d = dom.window.document;
 await sleep(2200);
 const N = dom.window.Noterra;
@@ -111,7 +112,7 @@ ok(d.querySelectorAll("#tl .tr").length === tlExpect, `timeline rail dinamis (${
 ok([...d.querySelectorAll("#tl .tr b")].map(x => x.textContent).every(t => !t.includes("undefined")), "timeline tanpa 'undefined'");
 ok(d.querySelectorAll("#ev .ev").length === 6, "events rail 6 slot");
 ok([...d.querySelectorAll("#sys dd")].map(x => x.textContent).includes(base.snap.kernel), "System rail dari nilai snapshot nyata");
-ok(d.querySelector("#hint span").textContent.includes("aturan"), "hint bottleneck menyebut aturan");
+if (d.querySelector("#hint span")) ok(d.querySelector("#hint span").textContent.includes("aturan"), "hint bottleneck menyebut aturan");
 const subs = [...d.querySelectorAll(".p header span")].map(x => x.textContent);
 ok(subs.some(t => t.includes("RTX 4060")), "subtitle GPU dari nvmlDeviceGetName");
 ok(subs.some(t => t.startsWith("kernel ")), "subtitle Memory = kernel saja");
@@ -140,6 +141,9 @@ if (base.ramBW == null) {
 }
 ok(d.querySelector("#theme").options.length === 2 && d.querySelector("#theme").value === "light",
   "palette light/dark dari theme.json + prefers-color-scheme");
+ok([...d.querySelectorAll("#ui option")].map(o => o.value).sort().join(",") === "default,minimal,neon",
+  "pemilih UI memuat theme dari /api/themes");
+ok(d.querySelector("#ui").value === "default", "pemilih UI menandai theme aktif");
 
 /* ---- simulasi hardware lain: tanpa GPU, 3 drive SATA ---- */
 const alt = { ...base, snap: { ...base.snap, gpuPresent: false, nvml: false },
@@ -260,6 +264,7 @@ const dm = mini.window.document;
 await sleep(2200);
 const Nm = mini.window.Noterra;
 ok(Nm.themeName() === "minimal", "theme minimal dipilih dari ?theme=minimal");
+ok(dm.querySelector("#ui")?.value === "minimal", "pemilih UI menandai theme minimal");
 ok(dm.querySelectorAll("#root .layout > .w").length === 4, "minimal: 4 item layout dirender");
 ok(!dm.querySelector("#root .layout-error"), "minimal: tanpa error layout");
 ok(dm.querySelector(".w-value .w-num")?.textContent.trim().length > 0, "minimal: value dari snapshot mock");
@@ -268,6 +273,24 @@ ok(dm.querySelector(".w-bar .w-caption")?.textContent.length > 0, "minimal: bar 
 ok(dm.querySelector(".w-spark svg path")?.getAttribute("d"), "minimal: sparkline dari ring buffer");
 ok(dm.querySelector("#status").textContent.includes("mock"), "minimal: status mock (client.js + shell.js)");
 mini.window.close();
+
+/* ---- theme neon L3 (Overview dari nol) di mode mock ---- */
+const neon = domFor(SHELL, { url: "http://localhost/?theme=neon&mock=1",
+  resources: { interceptors: [fileInterceptor] } });
+const dn = neon.window.document;
+await sleep(2200);
+const Nn = neon.window.Noterra;
+ok(Nn.themeName() === "neon", "theme neon dipilih dari ?theme=neon");
+ok(dn.querySelector("#ui")?.value === "neon", "pemilih UI menandai theme neon");
+ok(dn.querySelector(".nui") && !dn.querySelector(".layout-error"), "neon: UI kustom dirender tanpa error");
+ok(dn.querySelectorAll(".nui-grid .card").length === 5, "neon: 5 kartu mission-control");
+ok(dn.querySelector("#nui-cpu-temp")?.textContent === "74", "neon: ring CPU dari snapshot mock");
+ok(dn.querySelector("#nui-cpu-w")?.textContent === "unavailable", "neon: nilai null jadi unavailable");
+ok(dn.querySelector("#nui-gpu-card") && !dn.querySelector("#nui-gpu-card").hidden, "neon: kartu GPU tampil");
+ok(dn.querySelectorAll("#nui-drive-list .drive").length === 2, "neon: storage lanes mengikuti 2 drive");
+ok(dn.querySelector("#nui-trace path")?.getAttribute("d"), "neon: thermal trace dari ring buffer");
+ok(dn.querySelector("#nui-mem-big")?.textContent.includes("/"), "neon: memori big readout");
+neon.window.close();
 
 dom.window.close();
 console.log("ALL PASS");

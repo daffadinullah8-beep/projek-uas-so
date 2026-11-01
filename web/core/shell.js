@@ -1,4 +1,4 @@
-/* shell.js — bagian DOM: nav, status, pemilihan theme, view registry, tab Log.
+﻿/* shell.js — bagian DOM: nav, status, pemilihan theme, view registry, tab Log.
    Data ada di client.js (headless); theme hanya membaca ctx. */
 (function(){
 "use strict";
@@ -12,12 +12,12 @@ const {clamp,avg,fx,val,esc,mmss}=N.fmt;
 const ctx=N.ctx, REG=N.registry, MOCK=N.mock;
 const dataStart=N.start.bind(N);
 const params=new URLSearchParams(location.search);
-let theme=null, themeMeta=null, rec=null;
+let theme=null, themeMeta=null, rec=null, THEMES=[];
 Object.defineProperty(ctx,"recording",{get:()=>rec,configurable:true});
 
 /* ---- id DOM yang dipakai core; index.html wajib menyediakan empat pertama ---- */
 const DOM={
-  nav:"#nav", status:"#status", theme:"#theme", root:"#root",
+  nav:"#nav", status:"#status", theme:"#theme", ui:"#ui", root:"#root",
   iv:"#iv", lb:"#lb", tg:"#tg", tm:"#tm", mk:"#mk", rc:"#rc", ex:"#ex",
   asub:"#asub", an:"#an", mt:"#mt", tr:"#tr", gp:"#gp", ov:"#ov",
 };
@@ -30,6 +30,24 @@ function themeName(){
   const q=params.get("theme"); if(q)return q;
   try{const st=localStorage.getItem("nt.theme"); if(st)return st;}catch(e){}
   return "default";
+}
+/* pemilih THEME UI (tampilan Overview), terpisah dari palette warna */
+function populateUiSelect(){
+  const sel=$(DOM.ui); if(!sel)return;
+  const cur=themeName();
+  const names=THEMES.map(t=>t.name).filter(Boolean);
+  if(!names.includes(cur))names.unshift(cur);
+  sel.innerHTML=names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.value=cur;
+  sel.title="Pilih tampilan Overview (theme UI), bukan palette warna";
+  sel.onchange=()=>{
+    const next=sel.value;
+    try{localStorage.setItem("nt.theme",next);}catch(e){}
+    const u=new URL(location.href);
+    u.searchParams.set("theme",next);
+    u.searchParams.delete("layout");  // layout khusus theme lama
+    location.assign(u.toString());
+  };
 }
 function initPalette(){
   const pals=(themeMeta&&themeMeta.palettes)||["light","dark"];
@@ -48,6 +66,8 @@ async function loadTheme(){
   await N.loadSchema();
   let themes=[];
   try{const r=await fetch("/api/themes",{cache:"no-store"}); if(r.ok)themes=(await r.json()).themes||[];}catch(e){}
+  THEMES=themes;
+  populateUiSelect();
   const name=themeName();
   themeMeta=themes.find(t=>t.name===name)||{name:name,palettes:["light","dark"]};
   const lp=params.get("layout");
@@ -77,9 +97,10 @@ function renderNav(){
   const vs=[...VIEWS.values()].sort((a,b)=>(a.order??100)-(b.order??100));
   nav.innerHTML=`<h1>Monitor</h1>
 ${vs.map(v=>`  <button data-p="${esc(v.id)}">${esc(v.label)}</button>`).join("\n")}
-  <div class="foot"><label>Theme <select id="theme"></select></label><span id="status">Backend: offline</span></div>
+  <div class="foot"><label>UI <select id="ui"></select></label><label>Palette <select id="theme"></select></label><span id="status">Backend: offline</span></div>
 `;
   nav.querySelectorAll("button").forEach(b=>b.onclick=()=>show(b.dataset.p));
+  populateUiSelect();
 }
 function addView(id,v){
   VIEWS.set(id,{id,label:v.label||id,order:v.order??100,mount:v.mount,update:v.update});
@@ -137,8 +158,65 @@ function st(a){
   return{mean:m,med:s[s.length>>1],p95:s[Math.floor(s.length*.95)],sd:Math.sqrt(avg(v.map(x=>(x-m)**2))),min:s[0],max:s[v.length-1]};
 }
 async function loadSessions(){
-  const r=await fetch("/api/log/sessions",{cache:"no-store"});
-  SES=((await r.json()).sessions||[]).filter(s=>typeof s.id==="number");
+  try{
+    const r=await fetch("/api/log/sessions",{cache:"no-store"});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    SES=((await r.json()).sessions||[]).filter(s=>typeof s.id==="number");
+  }catch(e){
+    // Server mati / offline / dibuka lewat file:// -> sediakan dummy sesi contoh untuk demonstrasi UAS
+    SES=[
+      {
+        id: 1730000001,
+        label: "Cyberpunk 2077 - Bazzite OS",
+        tag: "Bazzite OS",
+        start_ms: 1730440000000,
+        started_iso: "2026-11-01 10:15:00",
+        interval_s: 1,
+        samples: 60,
+        markers: [{ name: "Night City Bench", idx: 10 }],
+        config: { "OS": "Bazzite OS", "Kernel": "6.11.5-bazzite", "Governor": "performance", "TDP Limit": "15 W" }
+      },
+      {
+        id: 1730000002,
+        label: "Cyberpunk 2077 - SteamOS",
+        tag: "SteamOS",
+        start_ms: 1730443600000,
+        started_iso: "2026-11-01 11:00:00",
+        interval_s: 1,
+        samples: 60,
+        markers: [{ name: "Night City Bench", idx: 10 }],
+        config: { "OS": "SteamOS", "Kernel": "6.5.0-valve", "Governor": "performance", "TDP Limit": "15 W" }
+      }
+    ];
+    if (!CSV[1730000001]) {
+      const ts = Array.from({length: 60}, (_, i) => 1730440000000 + i * 1000);
+      CSV[1730000001] = {
+        ts,
+        cpuT: Array.from({length: 60}, (_, i) => +(64 + Math.sin(i / 5) * 3 + (i % 7 === 0 ? 2 : 0)).toFixed(1)),
+        cpuW: Array.from({length: 60}, (_, i) => +(26 + Math.cos(i / 4) * 2.5).toFixed(1)),
+        gT: Array.from({length: 60}, (_, i) => +(66 + Math.sin(i / 6) * 2.5).toFixed(1)),
+        gW: Array.from({length: 60}, (_, i) => +(48 + Math.sin(i / 3) * 3.5).toFixed(1)),
+        vbw: Array.from({length: 60}, (_, i) => +(14.2 + Math.sin(i / 8) * 0.5).toFixed(1)),
+        prx: Array.from({length: 60}, (_, i) => +(3.2 + Math.cos(i / 9) * 0.2).toFixed(2)),
+        majF: Array.from({length: 60}, () => 0),
+        r0: Array.from({length: 60}, (_, i) => i % 10 === 0 ? 42 : 2)
+      };
+    }
+    if (!CSV[1730000002]) {
+      const ts = Array.from({length: 60}, (_, i) => 1730443600000 + i * 1000);
+      CSV[1730000002] = {
+        ts,
+        cpuT: Array.from({length: 60}, (_, i) => +(68 + Math.sin(i / 5) * 4 + (i % 6 === 0 ? 2.5 : 0)).toFixed(1)),
+        cpuW: Array.from({length: 60}, (_, i) => +(30 + Math.cos(i / 4) * 3).toFixed(1)),
+        gT: Array.from({length: 60}, (_, i) => +(70 + Math.sin(i / 6) * 3.2).toFixed(1)),
+        gW: Array.from({length: 60}, (_, i) => +(52 + Math.sin(i / 3) * 4).toFixed(1)),
+        vbw: Array.from({length: 60}, (_, i) => +(13.8 + Math.sin(i / 8) * 0.4).toFixed(1)),
+        prx: Array.from({length: 60}, (_, i) => +(3.0 + Math.cos(i / 9) * 0.2).toFixed(2)),
+        majF: Array.from({length: 60}, () => 0),
+        r0: Array.from({length: 60}, (_, i) => i % 10 === 0 ? 35 : 2)
+      };
+    }
+  }
   if(rec){const s=SES.find(x=>x.id===rec.id); if(s){rec.samples=s.samples; rec.mk=(s.markers||[]).length}}
 }
 async function toggleRec(){

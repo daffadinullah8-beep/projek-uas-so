@@ -1,11 +1,63 @@
 {
   "cols": 12,
-  "gap": 10,
+  "gap": 0,
   "items": [
-    {"widget": "cpu-panel", "x": 0, "y": 0, "w": 6, "h": 3},
-    {"widget": "gpu-panel", "x": 6, "y": 0, "w": 6, "h": 3},
-    {"widget": "memory-panel", "x": 0, "y": 3, "w": 6, "h": 2},
-    {"widget": "storage-panel", "x": 6, "y": 3, "w": 6, "h": 2},
-    {"widget": "rail", "x": 0, "y": 5, "w": 12, "h": 3}
+    {
+      "widget": "dashboard",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 12,
+      "props": {
+        "appTitle": "SteamOS vs Bazzite OS Monitor",
+        "theme": "dark",
+        "offlinePreview": true,
+        "nav": {
+          "overview": "Dashboard",
+          "log": "In-Game"
+        },
+        "vs": {
+          "title": "Performa Gaming Handheld (FPS & Suhu)",
+          "items": [
+            {
+              "name": "Bazzite OS",
+              "fps": 164,
+              "temp": 67
+            },
+            {
+              "name": "SteamOS",
+              "fps": 158,
+              "temp": 71
+            }
+          ]
+        },
+        "os": {
+          "title": "Benchmark Game: Bazzite OS vs SteamOS",
+          "labels": [
+            "Bazzite OS",
+            "SteamOS"
+          ],
+          "max": 200,
+          "axis": true,
+          "rows": [
+            {
+              "name": "Cyberpunk 2077",
+              "a": 164,
+              "b": 158
+            },
+            {
+              "name": "Hogwarts Legacy",
+              "a": 88,
+              "b": 94
+            },
+            {
+              "name": "GTA V / DOTA 2",
+              "a": 142,
+              "b": 138
+            }
+          ]
+        }
+      }
+    }
   ]
 }

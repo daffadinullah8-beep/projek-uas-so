@@ -1,74 +1,307 @@
 /* core.css — fallback netral untuk kelas/variabel yang dipakai core (terutama
    tab Log) dan widget primitif. Dimuat SEBELUM theme.css supaya theme tetap
    menang untuk selector yang sama. Semua nilai memakai var(--x, fallback),
-   jadi theme yang hanya mengatur token tetap konsisten. */
+   jadi theme yang hanya mengatur token tetap konsisten.
 
-:root{
-  --a:#3b5bdb;--b:#e8590c;--ok:#2b9348;--warn:#e08a00;--bad:#d6336c;
-  --bg:#f2f3f5;--surface:#fff;--line:#e2e4e9;--ink:#15171c;--mute:#6a7180;
+   Token di bawah diselaraskan dengan theme.css (dark default, aksen kuning) agar tampilan tetap benar walaupun theme belum / gagal dimuat. */
+
+/* Token default = DARK (sesuai desain baru); [data-theme="light"] untuk varian terang. */
+:root {
+  --a: #facc15;
+  --b: #d4a50b;
+  --dark: #ffffff;
+  --on-dark: #121212;
+  --ok: #22c55e;
+  --warn: #ed8936;
+  --bad: #ef4444;
+  --bg: #121212;
+  --surface: #1e1e1e;
+  --surface-2: #2a2a2a;
+  --line: #333333;
+  --ink: #ffffff;
+  --ink-2: #a0a0a0;
+  --mute: #a0a0a0;
+  --gray-bar: #4a4a4a;
+  --shadow: none;
+  --r-panel: 16px;
+  --r-ctl: 999px;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
-.btn{
-  font:inherit;color:var(--ink,#15171c);background:var(--surface,#fff);
-  border:1px solid var(--line,#e2e4e9);border-radius:6px;padding:6px 10px;cursor:pointer;
+[data-theme="light"] {
+  --b: #ca8a04;
+  --dark: #1d1d1f;
+  --on-dark: #ffffff;
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #e5e5ea;
+  --line: #e5e5e5;
+  --ink: #1d1d1f;
+  --ink-2: #6e6e73;
+  --mute: #6e6e73;
+  --gray-bar: #8e8e93;
 }
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.btn.on{background:var(--bad,#d6336c);border-color:var(--bad,#d6336c);color:#fff}
 
-.p{
-  background:var(--surface,#fff);border:1px solid var(--line,#e2e4e9);
-  border-radius:10px;padding:14px;min-width:0;
+/* disembunyikan secara visual, tetap ada di DOM & dibaca screen reader
+   (dipakai untuk select UI/Palette dan status backend di top bar) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
-.p h2{font-size:15px;margin:0 0 8px}
 
-.tag{
-  font-size:11px;padding:2px 8px;border-radius:99px;
-  border:1px solid var(--line,#e2e4e9);color:var(--mute,#6a7180);
+.btn {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink, #ffffff);
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, #333333);
+  border-radius: var(--r-ctl, 999px);
+  padding: 8px 16px;
+  cursor: pointer;
 }
-.bar-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.stack{display:grid;gap:14px}
-.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-.hint{font-size:12px;color:var(--mute,#6a7180)}
-.hint.warn{color:var(--warn,#e08a00)}
-.empty{color:var(--mute,#6a7180);text-align:center;padding:32px 0}
-.grow{flex:1}
-.sub{color:var(--mute,#6a7180);font-size:12px}
-.fld{
-  display:inline-flex;align-items:center;gap:4px;padding:0 8px;
-  background:var(--surface,#fff);border:1px solid var(--line,#e2e4e9);border-radius:6px;
+
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
 }
-.timer{font-family:var(--mono,monospace);color:var(--mute,#6a7180);min-width:52px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--mute,#6a7180);font-weight:500;padding:8px;border-bottom:1px solid var(--line,#e2e4e9)}
-td{padding:8px;border-bottom:1px solid var(--line,#e2e4e9)}
-tr.grp td{background:var(--bg,#f2f3f5);font-weight:600}
-svg.sp{width:100%;display:block}
-svg.sp.lg{height:200px;flex:none}
-svg path.l{fill:none;stroke-width:1.5;vector-effect:non-scaling-stroke}
+
+.btn.on {
+  background: var(--bad, #ef4444);
+  border-color: var(--bad, #ef4444);
+  color: #fff;
+}
+
+.p {
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, #333333);
+  border-radius: var(--r-panel, 16px);
+  padding: 20px;
+  min-width: 0;
+}
+
+.p h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--line, #333333);
+  color: var(--mute, #a0a0a0);
+}
+
+.bar-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
+.ctl {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--mute, #a0a0a0);
+}
+
+.hint.warn {
+  color: var(--warn, #ed8936);
+}
+
+.empty {
+  color: var(--mute, #a0a0a0);
+  text-align: center;
+  padding: 32px 0;
+}
+
+.grow {
+  flex: 1;
+}
+
+.sub {
+  color: var(--mute, #a0a0a0);
+  font-size: 12px;
+}
+
+.fld {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 14px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, #333333);
+  border-radius: var(--r-ctl, 999px);
+}
+
+.timer {
+  font-family: var(--mono, monospace);
+  color: var(--mute, #a0a0a0);
+  min-width: 52px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  color: var(--mute, #a0a0a0);
+  font-weight: 500;
+  padding: 8px;
+  border-bottom: 1px solid var(--line, #333333);
+}
+
+td {
+  padding: 8px;
+  border-bottom: 1px solid var(--line, #333333);
+}
+
+tr.grp td {
+  background: var(--surface-2, #2a2a2a);
+  font-weight: 600;
+}
+
+svg.sp {
+  width: 100%;
+  display: block;
+}
+
+svg.sp.lg {
+  height: 200px;
+  flex: none;
+}
+
+svg path.l {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
 
 /* widget primitif (layout.json) — hanya geometri dasar, warna dari token */
-.w{min-width:0;min-height:0}
-.w-value{display:flex;flex-direction:column;justify-content:center;gap:2px}
-.w-value .w-label{font-size:12px;color:var(--mute,#6a7180)}
-.w-value .w-num{font:600 20px/1.2 var(--mono,monospace);font-variant-numeric:tabular-nums}
-.w-value .w-unit{font-size:12px;color:var(--mute,#6a7180);margin-left:4px}
-.w-value .w-na{font:400 13px/1.2 var(--mono,monospace);color:var(--mute,#6a7180);cursor:help}
-.w-bar .w-track{height:10px;background:var(--bg,#f2f3f5);border-radius:4px;overflow:hidden}
-.w-bar .w-fill{height:100%;background:var(--a,#3b5bdb);transition:width .4s}
-.w-bar .w-caption{font-size:12px;color:var(--mute,#6a7180);margin-top:4px}
-.w-spark svg{width:100%;height:100%;min-height:24px;display:block}
-.w-gauge svg{width:100%;height:100%;display:block}
-.w-gauge text{font-family:var(--mono,monospace)}
-.w-missing{
-  display:flex;align-items:center;justify-content:center;text-align:center;
-  border:1px dashed var(--bad,#d6336c);border-radius:8px;color:var(--bad,#d6336c);
-  font-size:12px;padding:8px;
-}
-.layout-error{
-  border:1px solid var(--bad,#d6336c);border-radius:8px;padding:12px;
-  color:var(--bad,#d6336c);font-size:13px;
+.w {
+  min-width: 0;
+  min-height: 0;
 }
 
-/* host layout.json: lepas grid shell supaya grid layout yang mengatur */
-.layout-host{display:block;padding:12px 14px;min-width:0}
-.layout{min-width:0}
+.w-value {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.w-value .w-label {
+  font-size: 12px;
+  color: var(--mute, #a0a0a0);
+}
+
+.w-value .w-num {
+  font: 600 20px/1.2 var(--mono, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.w-value .w-unit {
+  font-size: 12px;
+  color: var(--mute, #a0a0a0);
+  margin-left: 4px;
+}
+
+.w-value .w-na {
+  font: 400 13px/1.2 var(--mono, monospace);
+  color: var(--mute, #a0a0a0);
+  cursor: help;
+}
+
+.w-bar .w-track {
+  height: 6px;
+  background: var(--surface-2, #2a2a2a);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.w-bar .w-fill {
+  height: 100%;
+  background: var(--a, #facc15);
+  border-radius: 99px;
+  transition: width .6s;
+}
+
+.w-bar .w-caption {
+  font-size: 12px;
+  color: var(--mute, #a0a0a0);
+  margin-top: 4px;
+}
+
+.w-spark svg {
+  width: 100%;
+  height: 100%;
+  min-height: 24px;
+  display: block;
+}
+
+.w-gauge svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.w-gauge text {
+  font-family: var(--mono, monospace);
+}
+
+.w-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px dashed var(--bad, #ef4444);
+  border-radius: 8px;
+  color: var(--bad, #ef4444);
+  font-size: 12px;
+  padding: 8px;
+}
+
+.layout-error {
+  border: 1px solid var(--bad, #ef4444);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--bad, #ef4444);
+  font-size: 13px;
+}
+
+/* host layout.json: lepas grid shell supaya grid layout yang mengatur.
+   Padding SENGAJA tidak diatur di sini: selector kelas ini lebih spesifik
+   daripada `main` di theme.css, sehingga padding 85px 59px 80px dari theme
+   (sesuai mockup) akan tertimpa kalau diisi. */
+.layout-host {
+  display: block;
+  min-width: 0;
+}
+
+.layout {
+  min-width: 0;
+}
