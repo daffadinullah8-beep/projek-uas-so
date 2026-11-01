@@ -22,6 +22,9 @@
   --ink-2: #a0a0a0;
   --mute: #a0a0a0;
   --gray-bar: #4a4a4a;
+  --accent: var(--a);
+  --bg-header: transparent;
+  --border: var(--line);
   --shadow: none;
   --r-panel: 16px;
   --r-ctl: 999px;
@@ -73,6 +76,94 @@
 
 .telemetry-mode[data-mode="live"] {
   color: var(--ok, #16803c);
+}
+
+#nav {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 16px;
+  width: 100%;
+  height: 72px;
+  min-height: 72px;
+  box-sizing: border-box;
+  padding: 0 24px;
+  position: static;
+  border-bottom: 1px solid var(--border, var(--line));
+  background: var(--bg-header, transparent);
+  font: 13px/1.2 system-ui, sans-serif;
+}
+
+#nav h1 {
+  flex: none;
+  margin: 0;
+  padding: 9px 16px;
+  font-size: 14.4px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+#nav .nav-pills,
+#nav .themesw {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: nowrap;
+  padding: 4px;
+}
+
+#nav button {
+  flex: none;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+#nav .telemetry-mode {
+  font: 600 11px/1.2 system-ui, sans-serif;
+}
+
+#nav button:focus-visible {
+  outline: 2px solid var(--accent, var(--a));
+  outline-offset: 2px;
+}
+
+#nav .foot {
+  display: flex;
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  #nav {
+    height: auto;
+    min-height: 72px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 12px 16px;
+  }
+}
+
+@media (max-width: 700px) {
+  #nav {
+    justify-content: center;
+    padding: 12px;
+  }
+
+  #nav .foot {
+    flex-basis: 100%;
+    justify-content: center;
+  }
 }
 
 main[hidden] {

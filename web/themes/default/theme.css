@@ -16,6 +16,9 @@
   --mute: #a0a0a0;
   --a: #facc15;               /* kuning utama */
   --b: #d4a50b;               /* kuning lebih gelap (seri kedua di chart) */
+  --accent: var(--a);
+  --bg-header: transparent;
+  --border: var(--line);
   --dark: #ffffff;            /* aksen kontras (tab chart aktif, dll.) */
   --on-dark: #121212;
   --gray-bar: #4a4a4a;
@@ -42,6 +45,7 @@
   --dark: #1d1d1f;
   --on-dark: #ffffff;
   --gray-bar: #8e8e93;
+  --bg-header: transparent;
 }
 
 * { box-sizing: border-box; }
@@ -61,18 +65,6 @@ body {
 }
 
 /* ---------- top bar: brand · tab pill · saklar tema ---------- */
-nav {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 24px 24px 0;
-  position: static;
-  height: auto;
-  border: 0;
-}
-
 nav h1 {
   font-size: 17.6px;
   margin: 0;
@@ -586,12 +578,10 @@ input[type=checkbox] { accent-color: var(--a); }
 
 @media(max-width: 1100px) {
   main { padding: 20px 16px 32px; }
-  nav { padding: 20px 16px 0; }
   .dash { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media(max-width: 900px) {
-  nav { flex-wrap: wrap; row-gap: 12px; }
   .card.cmp { padding: 20px 16px; }
   .cmp .axis, .cmp .crow { grid-template-columns: 76px minmax(0, 1fr) 54px; gap: 10px; }
   .cmp .legend { gap: 20px; }

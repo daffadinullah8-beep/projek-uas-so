@@ -13,6 +13,8 @@ const base = JSON.parse(readFileSync(path.join(PROJECT, "server", "fixtures", "s
 const SCHEMA = JSON.parse(readFileSync(path.join(PROJECT, "server", "metrics_meta.json"), "utf8"));
 const WEB = path.join(PROJECT, "web");
 const NEON_CSS = readFileSync(path.join(WEB, "themes", "neon", "theme.css"), "utf8");
+const DEFAULT_CSS = readFileSync(path.join(WEB, "themes", "default", "theme.css"), "utf8");
+const MINIMAL_CSS = readFileSync(path.join(WEB, "themes", "minimal", "theme.css"), "utf8");
 const CORE_CSS = readFileSync(path.join(WEB, "core", "core.css"), "utf8");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const fail = m => { console.error("FAIL:", m); process.exit(1); };
@@ -111,6 +113,12 @@ ok(d.querySelectorAll(".card.vs .item").length === 2, "Hardware Benchmark: 2 ite
 ok(d.querySelectorAll(".card.cmp .crow").length === 3, "Benchmark Game: 3 baris");
 ok(d.querySelector(".card.alt .subt")?.textContent.length > 0, "kartu NVMe: subjudul terisi");
 ok(d.querySelectorAll("#nav .themesw button").length === 3, "saklar Light/Dark/Neon terpasang");
+ok(["display: flex", "align-items: center", "justify-content: space-between",
+  "height: 72px", "padding: 0 24px"].every(rule => CORE_CSS.includes(rule)),
+  "core mengunci geometri header yang sama untuk semua palette");
+ok([DEFAULT_CSS, MINIMAL_CSS, NEON_CSS].every(css =>
+  css.includes("--accent:") && css.includes("--bg-header:") && css.includes("--border:")),
+  "token warna header tetap disediakan oleh setiap theme");
 ok(!d.querySelector("#dashboard-view").hidden, "Dashboard view aktif secara default");
 d.querySelector("#btn-tab-hud").click();
 await sleep(80);
@@ -301,11 +309,11 @@ ok(NEON_CSS.includes(':root[data-theme="neon"] #dashboard-view:not([hidden])')
   && NEON_CSS.includes("opacity:1;")
   && CORE_CSS.includes("#dashboard-view > #root"),
   "neon: dashboard view memakai grid, tinggi minimum, dan root tidak menyusut");
-ok(NEON_CSS.includes(':root[data-theme="neon"] #nav .foot')
-  && NEON_CSS.includes("flex-direction:row;")
-  && NEON_CSS.includes("flex-wrap:nowrap;")
-  && NEON_CSS.includes(':root[data-theme="neon"] #nav .themesw'),
-  "neon: theme switcher tetap sejajar di kanan header");
+ok(CORE_CSS.includes("#nav .foot")
+  && CORE_CSS.includes("#nav .themesw")
+  && CORE_CSS.includes("justify-content: space-between")
+  && !NEON_CSS.includes(":root[data-theme=\"neon\"] body:not(.hud-active) > #nav"),
+  "semua tema memakai baris header inti yang sama");
 neon.window.close();
 
 dom.window.close();
