@@ -14,6 +14,7 @@
   const storageIndex = () => Math.min(storageSel, Math.max(0, ((C && C.drives) || []).length - 1));
   const H = k => C.hist(k);
   const dynMax = k => C.max(k);
+  const metricKey = label => String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   function spark(svg, keys, cols, min) {
     const pairs = keys.map((k, i) => [H(k) || [], cols[i]]).filter(([d]) => d.length > 1);
@@ -80,7 +81,7 @@
   const B = {
     hd: b => {
       const g = gauge(b.g), 
-            el = mk(`<div class="hd"><div class="gw"></div><div class="stats">${b.stats.map(s => `<div><span>${s[1]}</span><b></b></div>`).join("")}</div></div>`);
+            el = mk(`<div class="hd"><div class="gw"></div><div class="stats">${b.stats.map(s => `<div data-metric="${metricKey(s[1])}"><span>${s[1]}</span><b></b></div>`).join("")}</div></div>`);
       el.querySelector(".gw").append(g.el);
       const bs = [...el.querySelectorAll("b")];
       return {
@@ -165,7 +166,7 @@
       };
     },
     bars: b => {
-      const el = mk(`<div class="bars">${b.items.map(it => `<div class="br"><span>${it.l}</span><div class="bar">${it.c.map(c => `<i style="background:var(${c})"></i>`).join("")}</div><em></em></div>`).join("")}</div>`);
+      const el = mk(`<div class="bars">${b.items.map(it => `<div class="br" data-metric="${metricKey(it.l)}"><span>${it.l}</span><div class="bar">${it.c.map(c => `<i style="background:var(${c})"></i>`).join("")}</div><em></em></div>`).join("")}</div>`);
       const rows = [...el.querySelectorAll(".br")];
       return {
         el,
@@ -197,7 +198,7 @@
     },
     chart: b => {
       let ti = 0;
-      const el = mk(`<div class="ch"><div class="tabs">${b.tabs.map(x => `<button>${x.n}</button>`).join("")}<em class="lg"></em></div><svg class="sp" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>`);
+      const el = mk(`<div class="ch"><div class="tabs">${b.tabs.map(x => `<button data-metric="${metricKey(x.n)}">${x.n}</button>`).join("")}<em class="lg"></em></div><svg class="sp" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>`);
       const sv = el.querySelector("svg"), btn = [...el.querySelectorAll("button")], lg = el.querySelector(".lg");
       const draw = () => spark(sv, b.tabs[ti].s.map(s => s[0]), b.tabs[ti].s.map(s => s[2]), b.tabs[ti].min);
       const tab = i => {
@@ -212,7 +213,7 @@
     },
     dl: b => {
       const hdr = b.hdr ? `<dt></dt>${b.hdr.map(h => `<dt class="h">${h}</dt>`).join("")}` : "";
-      const el = mk(`<dl class="${b.hdr ? "tb" : "pr"}">${hdr}${b.rows.map(r => `<dt>${r[0]}</dt>` + (b.hdr ? "<dd></dd><dd></dd>" : "<dd></dd>")).join("")}</dl>`);
+      const el = mk(`<dl class="${b.hdr ? "tb" : "pr"}">${hdr}${b.rows.map(r => `<dt data-metric="${metricKey(r[0])}">${r[0]}</dt>` + (b.hdr ? `<dd data-metric="${metricKey(r[0])}"></dd><dd data-metric="${metricKey(r[0])}"></dd>` : `<dd data-metric="${metricKey(r[0])}"></dd>`)).join("")}</dl>`);
       const dd = [...el.querySelectorAll("dd")];
       return {
         el,
@@ -242,7 +243,7 @@
           const items = b.items(C.data);
           if (items.length !== n) {
             n = items.length;
-            box.innerHTML = items.map(it => `<div class="br"><span>${it.l}</span><div class="bar">${it.c.map(c => `<i style="background:var(${c})"></i>`).join("")}</div><em></em></div>`).join("");
+            box.innerHTML = items.map(it => `<div class="br" data-metric="${it.l.endsWith(" capacity") ? "capacity" : "read"}"><span>${it.l}</span><div class="bar">${it.c.map(c => `<i style="background:var(${c})"></i>`).join("")}</div><em></em></div>`).join("");
             rows = [...box.querySelectorAll(".br")];
           }
           items.forEach((it, i) => {
@@ -267,7 +268,7 @@
           if (cols !== n) {
             n = cols;
             box.innerHTML = `<dt></dt>` + Array.from({ length: cols }, (_, i) => `<dt class="h">${esc(b.hdr(C.data, i))}</dt>`).join("") +
-              b.rows.map(r => `<dt>${r[0]}</dt>` + Array.from({ length: cols }, () => "<dd></dd>").join("")).join("");
+              b.rows.map(r => `<dt data-metric="${metricKey(r[0])}">${r[0]}</dt>` + Array.from({ length: cols }, () => `<dd data-metric="${metricKey(r[0])}"></dd>`).join("")).join("");
             dd = [...box.querySelectorAll("dd")];
           }
           let j = 0;
@@ -308,6 +309,7 @@
             tabs.forEach((x, j) => {
               const btn = document.createElement("button");
               btn.textContent = x.n;
+              btn.dataset.metric = metricKey(x.n);
               btn.dataset.key = x.s[0] ? x.s[0][0] : "";
               btn.dataset.drive = x.n;
               btn.onclick = () => { ti = j; draw(); if (b.onSelect) b.onSelect(j); };
@@ -323,7 +325,7 @@
 
   function panel(c) {
     const el = document.createElement("section");
-    el.className = "p";
+    el.className = "p p-" + metricKey(c.title);
     el.innerHTML = `<header><h2>${c.title}</h2><span></span></header><div class="col"></div><div class="col"></div>`;
     const cols = el.querySelectorAll(".col"), us = [];
     [c.l, c.r].forEach((side, k) => side.forEach(b => { const x = B[b.t](b); cols[k].append(x.el); us.push(x.up); }));

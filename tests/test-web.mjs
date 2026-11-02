@@ -14,6 +14,8 @@ const SCHEMA = JSON.parse(readFileSync(path.join(PROJECT, "server", "metrics_met
 const WEB = path.join(PROJECT, "web");
 const NEON_CSS = readFileSync(path.join(WEB, "themes", "neon", "theme.css"), "utf8");
 const DEFAULT_CSS = readFileSync(path.join(WEB, "themes", "default", "theme.css"), "utf8");
+const DEFAULT_LAYOUT = JSON.parse(readFileSync(path.join(WEB, "themes", "default", "layout.json"), "utf8"));
+const DETAILED_LAYOUT = JSON.parse(readFileSync(path.join(WEB, "themes", "default", "layout-detailed.json"), "utf8"));
 const MINIMAL_CSS = readFileSync(path.join(WEB, "themes", "minimal", "theme.css"), "utf8");
 const CORE_CSS = readFileSync(path.join(WEB, "core", "core.css"), "utf8");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -119,6 +121,26 @@ ok(["display: flex", "align-items: center", "justify-content: space-between",
 ok([DEFAULT_CSS, MINIMAL_CSS, NEON_CSS].every(css =>
   css.includes("--accent:") && css.includes("--bg-header:") && css.includes("--border:")),
   "token warna header tetap disediakan oleh setiap theme");
+ok(DEFAULT_LAYOUT.gap === 16 && DETAILED_LAYOUT.gap === 16,
+  "layout default dan detail sama-sama memisahkan widget dengan jarak 16px");
+ok(DEFAULT_LAYOUT.items.filter(item => ["cpu", "gpu"].includes(item.widget))
+    .every(item => item.h === 1 && item.y === 4)
+  && DEFAULT_LAYOUT.items.filter(item => ["memory", "storage"].includes(item.widget))
+    .every(item => item.h === 1 && item.y === 5)
+  && DETAILED_LAYOUT.items.filter(item => ["cpu-panel", "gpu-panel"].includes(item.widget))
+    .every(item => item.h === 1 && item.y === 0)
+  && DETAILED_LAYOUT.items.filter(item => ["memory-panel", "storage-panel"].includes(item.widget))
+    .every(item => item.h === 1 && item.y === 1)
+  && DEFAULT_CSS.includes("grid-auto-rows: minmax(400px, auto);"),
+  "pasangan CPU/GPU dan Memory/Storage berbagi baris grid dengan tinggi seragam");
+ok(DEFAULT_CSS.includes(".layout-host > .layout > .w:has(> .p) {")
+  && DEFAULT_CSS.includes("display: flex;")
+  && DEFAULT_CSS.includes(".layout-host > .layout > .w:has(> .p) > .p {")
+  && DEFAULT_CSS.includes("flex: 1 1 auto;"),
+  "panel CPU/GPU dan Memory/Storage memenuhi tinggi sel grid yang sama");
+ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b2 { background: #3b5f7c; color: #fff;')
+  && DEFAULT_CSS.includes('[data-theme="light"] .cmp .legend i.o { background: #3b5f7c;'),
+  "bar dan legenda SteamOS kontras pada theme light");
 ok(!d.querySelector("#dashboard-view").hidden, "Dashboard view aktif secara default");
 d.querySelector("#btn-tab-hud").click();
 await sleep(80);
@@ -266,6 +288,60 @@ await sleep(2200);
 ok(dl.querySelectorAll("#root .layout > .w").length === 5, "?layout=layout.json: 5 item komposit");
 ok([...dl.querySelectorAll(".p h2")].map(h => h.textContent).join(",") === "CPU,GPU,Memory,Storage",
   "?layout=layout.json: 4 panel dari widget komposit");
+ok(["cpu", "gpu", "memory", "storage"].every(name => dl.querySelector(`.p-${name}`)),
+  "panel komposit memiliki selector semantik tanpa mengubah struktur utama");
+const visible = selector => {
+  const el = dl.querySelector(selector);
+  return el && dl.defaultView.getComputedStyle(el).display !== "none";
+};
+ok(visible(".p-cpu header h2") && visible(".p-cpu .hd .gw")
+  && visible('.p-cpu .stats [data-metric="util"]')
+  && visible('.p-cpu .stats [data-metric="p-clock"]')
+  && visible('.p-cpu .stats [data-metric="e-clock"]')
+  && visible(".p-cpu .ch svg.sp"),
+  "CPU: judul, ring gauge, utilisasi, clock P/E, dan grafik tampil");
+ok(visible(".p-gpu header h2") && visible(".p-gpu .hd .gw")
+  && ["power", "sm-clock", "util", "vram"].every(metric =>
+    visible(`.p-gpu .stats [data-metric="${metric}"]`))
+  && visible(".p-gpu .ch svg.sp"),
+  "GPU: judul, ring gauge, metrik utama, dan grafik tampil");
+ok(!visible(".p-cpu .hint2")
+  && ["governor", "epp", "turbo", "context-switches", "interrupts", "throttle"]
+    .every(metric => !visible(`.p-cpu .pr [data-metric="${metric}"]`))
+  && !visible('.p-gpu .bars [data-metric="pcie-receive"]')
+  && !visible('.p-gpu .bars [data-metric="pcie-transmit"]'),
+  "petunjuk manual dan detail tingkat rendah tetap tersembunyi");
+ok(DEFAULT_CSS.includes(".layout-host { padding-top: 12px; }")
+  && DEFAULT_CSS.includes(".p svg.sp { flex: none; width: 100%; height: 96px; min-height: 0; }")
+  && DEFAULT_CSS.includes("grid-auto-rows: minmax(0, auto);")
+  && DEFAULT_CSS.includes("align-items: stretch;")
+  && DEFAULT_CSS.includes(".layout-host > .layout > .w:has(> .p) > .p { flex: 1 1 auto; }")
+  && DEFAULT_CSS.includes(".p-cpu .cores > div:not(.hint2) { display: grid;")
+  && DEFAULT_CSS.includes(".p-cpu .hint2,"),
+  "grafik kompak, panel mengikuti konten dengan tinggi seimbang, dan petunjuk tidak masuk grid core");
+ok(["governor", "epp", "turbo", "pl1-pl2", "context-switches", "interrupts", "throttle", "power-pl1", "idle-residency"]
+  .every(metric => dl.querySelector(`.p-cpu [data-metric="${metric}"]`))
+  && dl.querySelector(".p-cpu .hint2")
+  && dl.querySelector(".p-cpu .cores .cc u"),
+  "CPU: data sekunder dan frekuensi core tetap ada di DOM untuk diperbarui");
+ok(["memory-clock", "bus-width", "p-state", "pcie-now-max", "draw-limit", "throttle", "fan", "nvidia-driver",
+  "pcie-receive", "pcie-transmit"].every(metric => dl.querySelector(`.p-gpu [data-metric="${metric}"]`))
+  && dl.querySelector(".p-gpu .ch svg.sp"),
+  "GPU: detail tersembunyi tetap ada, grafik utama dipertahankan");
+ok(["major-faults", "minor-faults", "swap-i-o", "measured-bandwidth", "hugepages", "swappiness"]
+  .every(metric => dl.querySelector(`.p-memory [data-metric="${metric}"]`))
+  && dl.querySelector(".p-memory .ch svg.sp"),
+  "Memory: statistik sekunder tetap di DOM dan grafik RAM tersedia");
+ok(["queue", "scheduler", "readahead", "await", "iops", "util"]
+  .every(metric => dl.querySelector(`.p-storage [data-metric="${metric}"]`))
+  && dl.querySelector(".p-storage .ch svg.sp")
+  && dl.querySelector(".p-storage .bars [data-metric=capacity]"),
+  "Storage: detail sekunder tetap di DOM, grafik dan bar kapasitas tersedia");
+ok(DEFAULT_CSS.includes(".p-cpu .pr [data-metric]") && DEFAULT_CSS.includes(".p-gpu .pr [data-metric]")
+  && DEFAULT_CSS.includes(".p-memory .tabs [data-metric=\"page-faults\"]")
+  && DEFAULT_CSS.includes(".p-storage .tb [data-metric=\"queue\"]")
+  && DEFAULT_CSS.includes(".p .stats b { font-size: 24px; font-weight: 700; }"),
+  "CSS memangkas data sekunder dan menonjolkan angka utama");
 ok(dl.querySelectorAll("#tl .tr").length === tlExpect, "?layout=layout.json: rail timeline");
 lay.window.close();
 

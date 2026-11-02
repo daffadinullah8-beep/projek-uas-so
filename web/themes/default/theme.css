@@ -660,8 +660,72 @@ nav button[aria-current=true], nav button[aria-pressed=true] {
 /* compare OS */
 .card.cmp h2 { font-weight: 500; }
 [data-theme="light"] .cmp .b1 { background: #262626; color: #fff; }
-[data-theme="light"] .cmp .b2 { background: #fff; color: #262626; box-shadow: inset 0 0 0 1px #ececee; }
+[data-theme="light"] .cmp .b2 { background: #3b5f7c; color: #fff; box-shadow: none; }
 .cmp .b2 { background: #9a9a9a; }
-[data-theme="light"] .cmp .legend i.o { background: #fff; box-shadow: inset 0 0 0 1px #ddd; }
+[data-theme="light"] .cmp .legend i.o { background: #3b5f7c; box-shadow: none; }
 .cmp .legend i.o { background: #9a9a9a; }
 [data-theme="light"] .cmp .legend i { background: #262626; }
+
+/* Make composite panels fill their grid cells so each dashboard row aligns. */
+.layout-host > .layout > .w:has(> .p) {
+  display: flex;
+  align-self: stretch;
+}
+
+.layout-host > .layout:has(> .w > .p) {
+  grid-auto-rows: minmax(400px, auto);
+  align-items: stretch;
+}
+
+.layout-host > .layout > .w:has(> .p) > .p {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Prune secondary telemetry without removing updater-owned elements. */
+.p { padding: 16px; gap: 16px; }
+.p > .col { justify-content: flex-start; gap: 12px; }
+.p header span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p .stats b { font-size: 24px; font-weight: 700; }
+.p .bars { gap: 14px; }
+.p .ch { flex: 0 1 auto; gap: 8px; }
+.p svg.sp { flex: none; width: 100%; height: 96px; min-height: 0; }
+.layout-host { padding-top: 12px; }
+.layout-host > .layout:has(> .w > .p) {
+  grid-auto-rows: minmax(0, auto);
+  align-items: stretch;
+}
+.layout-host > .layout > .w:has(> .p) { align-self: stretch; }
+.layout-host > .layout > .w:has(> .p) > .p { flex: 1 1 auto; }
+
+.p-cpu .stats [data-metric="migrations"],
+.p-cpu .bars,
+.p-cpu .pr [data-metric],
+.p-cpu .hint2,
+.p-cpu .cc u { display: none; }
+.p-cpu .col { min-height: 0; }
+.p-cpu .ch { min-height: 0; }
+.p-cpu .cores > div:not(.hint2) { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+.p-cpu .cc { height: 48px; border-radius: 8px; }
+
+.p-gpu .chips,
+.p-gpu .bars .br:not([data-metric="vram"]),
+.p-gpu .pr [data-metric],
+.p-gpu .tabs [data-metric="vram-bw"],
+.p-gpu .tabs [data-metric="pcie"] { display: none; }
+
+.p-memory .stats [data-metric="major-faults"],
+.p-memory .stats [data-metric="swap-i-o"],
+.p-memory .bars .br:not([data-metric="ram"]),
+.p-memory .pr [data-metric="measured-bandwidth"],
+.p-memory .pr [data-metric="hugepages"],
+.p-memory .pr [data-metric="swappiness"],
+.p-memory .tabs [data-metric="page-faults"] { display: none; }
+
+.p-storage .stats [data-metric="iops"],
+.p-storage .stats [data-metric="await"],
+.p-storage .stats [data-metric="util"],
+.p-storage .tb [data-metric="queue"],
+.p-storage .tb [data-metric="scheduler"],
+.p-storage .tb [data-metric="readahead"],
+.p-storage .tb [data-metric="await"] { display: none; }
