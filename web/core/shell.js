@@ -111,7 +111,9 @@ async function loadTheme(){
   const css=(themeMeta&&themeMeta.css)||"theme.css";
   const link=document.createElement("link");
   link.id="ui-theme-stylesheet";
-  link.rel="stylesheet"; link.href="themes/"+encodeURIComponent(name)+"/"+css;
+  const assetVersion=themeMeta&&themeMeta.version;
+  link.rel="stylesheet";
+  link.href="themes/"+encodeURIComponent(name)+"/"+css+(assetVersion?"?v="+encodeURIComponent(assetVersion):"");
   document.head.append(link);
   // theme tanpa script: overview langsung dari layout.json (L2)
   if(!themeMeta.entry&&(lp||themeMeta.layout)){

@@ -340,7 +340,8 @@ main {
   font-style: normal;
 }
 
-.vs .pbar i.g { background: var(--gray-bar); color: #fff; }
+.vs .pbar i.g { background: #fff; color: #000; }
+[data-theme="light"] .vs .pbar i.g { background: var(--gray-bar); color: #fff; }
 .vs .line b { font-weight: 400; font-size: 12.8px; }
 
 /* ---------- Compare 2 OS ---------- */
@@ -659,12 +660,16 @@ nav button[aria-current=true], nav button[aria-pressed=true] {
 
 /* compare OS */
 .card.cmp h2 { font-weight: 500; }
-[data-theme="light"] .cmp .b1 { background: #262626; color: #fff; }
-[data-theme="light"] .cmp .b2 { background: #3b5f7c; color: #fff; box-shadow: none; }
-.cmp .b2 { background: #9a9a9a; }
-[data-theme="light"] .cmp .legend i.o { background: #3b5f7c; box-shadow: none; }
-.cmp .legend i.o { background: #9a9a9a; }
-[data-theme="light"] .cmp .legend i { background: #262626; }
+[data-theme="light"] .cmp .b1 { background: var(--a); color: #000; }
+[data-theme="light"] .cmp .b2 { background: var(--gray-bar); color: #fff; box-shadow: none; }
+.cmp .b1 { background: var(--a); color: var(--on-dark); }
+.cmp .b2 { background: #fff; color: #000; }
+.cmp .legend i.o { background: var(--gray-bar); }
+.cmp .legend i { background: var(--a); }
+[data-theme="light"] .cmp .legend i.o { background: var(--gray-bar); box-shadow: none; }
+[data-theme="light"] .cmp .legend i { background: var(--a); }
+[data-theme="light"] .cmp .b2 { background: var(--gray-bar); color: #fff; }
+[data-theme="dark"] .cmp .legend i.o { background: #fff; }
 
 /* Make composite panels fill their grid cells so each dashboard row aligns. */
 .layout-host > .layout > .w:has(> .p) {

@@ -14,6 +14,7 @@ const SCHEMA = JSON.parse(readFileSync(path.join(PROJECT, "server", "metrics_met
 const WEB = path.join(PROJECT, "web");
 const NEON_CSS = readFileSync(path.join(WEB, "themes", "neon", "theme.css"), "utf8");
 const DEFAULT_CSS = readFileSync(path.join(WEB, "themes", "default", "theme.css"), "utf8");
+const DEFAULT_THEME = JSON.parse(readFileSync(path.join(WEB, "themes", "default", "theme.json"), "utf8"));
 const DEFAULT_LAYOUT = JSON.parse(readFileSync(path.join(WEB, "themes", "default", "layout.json"), "utf8"));
 const DETAILED_LAYOUT = JSON.parse(readFileSync(path.join(WEB, "themes", "default", "layout-detailed.json"), "utf8"));
 const MINIMAL_CSS = readFileSync(path.join(WEB, "themes", "minimal", "theme.css"), "utf8");
@@ -56,7 +57,7 @@ function installFetch(w, snapshotFn) {
     const url = String(u), method = (opts && opts.method) || "GET";
     if (url.includes("/api/schema") || url.includes("/api/mock/schema")) return { ok: true, json: async () => SCHEMA };
     if (url.includes("/api/themes")) return { ok: true, json: async () => ({ themes: [
-      { name: "default", entry: "overview.js", palettes: ["light", "dark"] },
+      { name: "default", version: DEFAULT_THEME.version, entry: "overview.js", palettes: ["light", "dark"] },
       { name: "minimal", entry: null, layout: "layout.json", palettes: ["light", "dark"] },
       { name: "neon", entry: "overview.js", palettes: ["dark", "light"] }] }) };
     if (url.includes("/api/health") || url.includes("/api/mock/health")) return { ok: true, json: async () => HEALTH };
@@ -138,9 +139,28 @@ ok(DEFAULT_CSS.includes(".layout-host > .layout > .w:has(> .p) {")
   && DEFAULT_CSS.includes(".layout-host > .layout > .w:has(> .p) > .p {")
   && DEFAULT_CSS.includes("flex: 1 1 auto;"),
   "panel CPU/GPU dan Memory/Storage memenuhi tinggi sel grid yang sama");
-ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b2 { background: #3b5f7c; color: #fff;')
-  && DEFAULT_CSS.includes('[data-theme="light"] .cmp .legend i.o { background: #3b5f7c;'),
-  "bar dan legenda SteamOS kontras pada theme light");
+ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b2 { background: var(--gray-bar); color: #fff;')
+  && DEFAULT_CSS.includes('[data-theme="light"] .cmp .legend i.o { background: var(--gray-bar);')
+  && DEFAULT_CSS.includes('--gray-bar: #8e8e93;'),
+  "bar dan legenda SteamOS memakai abu-abu yang sama dengan tema light");
+ok(DEFAULT_CSS.includes('.cmp .b1 { background: var(--a); color: var(--on-dark); }')
+  && DEFAULT_CSS.includes('.cmp .b2 { background: #fff; color: #000; }')
+  && DEFAULT_CSS.includes('.cmp .legend i { background: var(--a); }')
+  && DEFAULT_CSS.includes('.cmp .legend i.o { background: var(--gray-bar); }'),
+  "bar Bazzite kuning dan bar SteamOS putih pada tema dark");
+ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b1 { background: var(--a); color: #000; }')
+  && DEFAULT_CSS.includes('[data-theme="light"] .cmp .legend i { background: var(--a); }'),
+  "bar dan simbol Bazzite kuning, angka bar hitam pada tema light");
+ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b2 { background: var(--gray-bar); color: #fff; }'),
+  "bar SteamOS tetap abu-abu pada tema light");
+ok(DEFAULT_CSS.includes('.vs .pbar i.g { background: #fff; color: #000; }')
+  && DEFAULT_CSS.includes('[data-theme="light"] .vs .pbar i.g { background: var(--gray-bar); color: #fff; }')
+  && !DEFAULT_CSS.includes('[data-theme="dark"] .vs .pbar i.g { color: #fff; }')
+  && DEFAULT_CSS.includes('[data-theme="dark"] .cmp .legend i.o { background: #fff; }'),
+  "bar SteamOS abu-abu di tema light, putih di tema dark, dengan angka hitam");
+ok(DEFAULT_THEME.version === "2.1"
+  && d.querySelector("#ui-theme-stylesheet")?.getAttribute("href") === "themes/default/theme.css?v=2.1",
+  "stylesheet tema default memakai URL versi baru untuk melewati cache");
 ok(!d.querySelector("#dashboard-view").hidden, "Dashboard view aktif secara default");
 d.querySelector("#btn-tab-hud").click();
 await sleep(80);
