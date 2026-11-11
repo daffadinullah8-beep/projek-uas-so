@@ -13,3 +13,9 @@ node_modules/
 .venv/
 **/.venv/
 **/node_modules/
+
+node_modules/
+dist/
+*.env
+builder-effective-config.yaml
+builder-debug.yml

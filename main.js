@@ -22,6 +22,7 @@ function findProjectRoot() {
   const candidates = [
     app.getAppPath(),
     path.join(app.getAppPath(), "Lovelace"),
+    path.resolve(__dirname),
     path.resolve(__dirname, "Lovelace"),
     path.resolve(__dirname, "..", "Lovelace")
   ];
@@ -147,12 +148,17 @@ function stopBackend() {
 }
 
 async function createWindow(root) {
+  const iconPath = process.platform === "win32"
+    ? path.join(root, "assets", "icon.ico")
+    : path.join(root, "assets", "icon.png");
+
   const win = new BrowserWindow({
     title: "Aether OS - Performance Monitor",
-    width: 1280,
+    width: 1200,
     height: 800,
-    minWidth: 900,
+    minWidth: 800,
     minHeight: 600,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     autoHideMenuBar: true,
     transparent: true,
     backgroundColor: "#121212",

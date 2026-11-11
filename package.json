@@ -2,7 +2,8 @@
   "name": "aether-os",
   "version": "1.0.0",
   "description": "Aether OS local hardware performance monitor",
-  "author": "Daffa, Repat",
+  "author": "Daffa, Repat <dev@aetheros.id>",
+  "desktopName": "aether-os",
   "repository": {
     "type": "git",
     "url": "https://github.com/daffadinullah8-beep/projek-uas-so.git"
@@ -10,7 +11,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "build": "electron-builder --win --x64",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -wl"
   },
   "devDependencies": {
     "electron": "^45.2.1",
@@ -25,6 +29,7 @@
       "preload.js",
       "server/**/*",
       "web/**/*",
+      "assets/**/*",
       "README.md",
       "!server/.venv/**/*",
       "!server/**/__pycache__/**/*"
@@ -33,7 +38,43 @@
       "output": "dist"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Aether OS",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "assets/icon.png",
+      "maintainer": "Daffa, Repat <dev@aetheros.id>",
+      "syncDesktopName": true
     }
   }
 }
