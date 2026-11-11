@@ -13,8 +13,8 @@
     "start": "electron .",
     "dist": "electron-builder",
     "build": "electron-builder --win --x64",
-    "build:win": "electron-builder --win --x64",
-    "build:linux": "electron-builder --linux",
+    "build:win": "electron-builder --win --x64 --publish never",
+    "build:linux": "electron-builder --linux --publish never",
     "build:all": "electron-builder -wl"
   },
   "devDependencies": {
