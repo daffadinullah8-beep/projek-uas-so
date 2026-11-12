@@ -31,7 +31,8 @@ Server melayani frontend di `/`, polled endpoint `GET /api/snapshot`
 repo: `logs/<tanggal>_<label>/samples.csv` + `meta.json` schema v1 (label, tag,
 interval_s, snapshot konfigurasi saat sesi mulai — governor/EPP/turbo/power
 limit/sysctl/kernel/driver, marker, status). Sample unavailable ditulis kosong
-di CSV, bukan 0.
+di CSV, bukan 0. Pada aplikasi Electron terpaket, rekaman disimpan pada folder
+`logs` di direktori data pengguna aplikasi agar tetap bisa ditulis dari AppImage.
 
 ## Sumber metrik
 

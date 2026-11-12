@@ -72,13 +72,36 @@ function pythonCommand(root) {
 function startBackend(root) {
   if (backend && backend.exitCode === null) return backend;
 
-  const python = pythonCommand(root);
-  backend = spawn(python.command, [
-    ...python.prefix,
-    path.join(root, "server", "server.py")
-  ], {
+  let command;
+  let args;
+  const env = { ...process.env };
+
+  if (app.isPackaged) {
+    command = path.join(
+      process.resourcesPath,
+      "backend",
+      process.platform === "win32" ? "aether-backend.exe" : "aether-backend"
+    );
+    args = [];
+
+    if (process.platform !== "win32") {
+      fs.accessSync(command, fs.constants.X_OK);
+    }
+
+    env.AETHER_SERVER_DIR = path.join(root, "server");
+    env.AETHER_LOG_DIR = path.join(app.getPath("userData"), "logs");
+  } else {
+    const python = pythonCommand(root);
+    command = python.command;
+    args = [
+      ...python.prefix,
+      path.join(root, "server", "server.py")
+    ];
+  }
+
+  backend = spawn(command, args, {
     cwd: root,
-    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    env: { ...env, PYTHONUNBUFFERED: "1" },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
   });

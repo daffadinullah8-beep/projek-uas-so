@@ -24,7 +24,7 @@ resolusi tetap `unavailable` sampai integrasi VKD3D/DX12 disediakan.
 ### Persyaratan
 
 - Node.js dan npm untuk aplikasi desktop serta smoke test UI.
-- Python 3 untuk menjalankan backend.
+- Python 3 untuk menjalankan backend dalam mode pengembangan.
 - Linux direkomendasikan untuk telemetry hardware aktual karena collector
   membaca `/proc` dan `/sys`. Electron di Windows berjalan dalam mode demo.
 
@@ -96,10 +96,14 @@ npm start
 ```
 
 Launcher menjalankan backend sebagai child process dan menutupnya saat jendela
-ditutup. Di Windows, dashboard dibuka dalam mode fixture (`?mock=1`) karena
-collector telemetry memakai sumber Linux (`/proc` dan `/sys`); di Linux,
-dashboard memakai telemetry live. Untuk membuat paket distribusi, jalankan
-`npm run dist`.
+ditutup. Build distribusi membundel backend FastAPI sebagai executable mandiri,
+jadi pengguna aplikasi hasil build tidak perlu memasang Python. Di Windows,
+dashboard dibuka dalam mode fixture (`?mock=1`) karena collector telemetry
+memakai sumber Linux (`/proc` dan `/sys`); di Linux, dashboard memakai telemetry
+live. Untuk membuat paket distribusi, siapkan Python 3.11 dan dependensi
+`server/requirements.txt` beserta PyInstaller pada mesin build, lalu jalankan
+`npm run build:win` atau `npm run build:linux`. Build backend harus dilakukan
+pada OS targetnya masing-masing.
 
 ## Struktur Proyek
 

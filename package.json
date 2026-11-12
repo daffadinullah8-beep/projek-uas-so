@@ -35,6 +35,16 @@
       "!server/.venv/**/*",
       "!server/**/__pycache__/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "backend-dist",
+        "to": "backend",
+        "filter": [
+          "aether-backend",
+          "aether-backend.exe"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist"
     },

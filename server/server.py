@@ -30,7 +30,7 @@ try:
 except Exception:
     NVML = False
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(os.environ.get("AETHER_SERVER_DIR", Path(__file__).resolve().parent)).resolve()
 app = FastAPI(title="Lovelace monitor")
 
 # ---- helpers ----------------------------------------------------------------
@@ -996,7 +996,7 @@ def health():
 
 # ---- recording (persistensi log di repo) -------------------------------------
 
-LOGS = BASE.parent / "logs"
+LOGS = Path(os.environ.get("AETHER_LOG_DIR", BASE.parent / "logs")).resolve()
 LOG_COLS = [("cpuT", "cpu_temp_c"), ("cpuW", "cpu_power_w"), ("gT", "gpu_temp_c"),
             ("gW", "gpu_power_w"), ("vbw", "vram_bw_gbs"), ("prx", "pcie_rx_gbs"),
             ("majF", "mem_major_faults_s"), ("r0", "drive0_read_mbps")]
@@ -1059,7 +1059,7 @@ async def log_start(req: Request):
                           status="recording", config=config_snapshot())
     asyncio.create_task(_record(sid))
     _write_meta(sid)
-    return JSONResponse({"id": sid, "dir": str(d.relative_to(BASE.parent))})
+    return JSONResponse({"id": sid, "dir": str(d.relative_to(LOGS.parent))})
 
 @app.post("/api/log/stop")
 async def log_stop(req: Request):
@@ -1143,7 +1143,7 @@ def log_delete(sid: str):
     if target is None:
         return JSONResponse({"error": "session tidak ditemukan"}, status_code=404)
     shutil.rmtree(target)
-    return JSONResponse({"deleted": str(target.relative_to(BASE.parent))})
+    return JSONResponse({"deleted": str(target.relative_to(LOGS.parent))})
 
 WEB = BASE.parent / "web"
 SAMPLE = BASE / "fixtures" / "snapshot-sample.json"
