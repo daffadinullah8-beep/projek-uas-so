@@ -51,8 +51,10 @@ const SESSION = { id: 1793000000000, label: "rec-test", tag: "none", interval_s:
 
 /* stub fetch identik per harness: hanya /api/snapshot yang menaikkan counter i */
 function installFetch(w, snapshotFn) {
-  let i = 0, recStarted = false, recStopped = false;
+  let i = 0, recStarted = false, recStopped = false, recDeleted = false, deleteCalls = 0;
   w.matchMedia = () => ({ matches: false });
+  w.confirm = () => { throw new Error("window.confirm must not be used"); };
+  w.getDeleteCalls = () => deleteCalls;
   w.fetch = async (u, opts) => {
     const url = String(u), method = (opts && opts.method) || "GET";
     if (url.includes("/api/schema") || url.includes("/api/mock/schema")) return { ok: true, json: async () => SCHEMA };
@@ -68,11 +70,16 @@ function installFetch(w, snapshotFn) {
     if (url.includes("/api/mock/snapshot")) return { ok: true, json: async () => base };
     if (url.includes("/api/log/start")) { recStarted = true; return { ok: true, json: async () => ({ id: SESSION.id, dir: "logs/test" }) }; }
     if (url.includes("/api/log/stop")) { recStopped = true; return { ok: true, json: async () => ({ id: SESSION.id, status: "saved", samples: 12 }) }; }
+    if (method === "DELETE" && /\/api\/log\/\d+$/.test(url)) {
+      deleteCalls++;
+      recDeleted = true;
+      return { ok: true, json: async () => ({ deleted: "logs/test" }) };
+    }
     if (url.includes("/api/log/marker")) return { ok: true, json: async () => ({ id: SESSION.id, markers: [{ ts_ms: 1, since_s: 1.5, note: "" }] }) };
     if (url.includes("/api/log/sessions")) {
       const s = { ...SESSION, status: recStopped ? "saved" : "recording",
         samples: recStopped ? 12 : 3, markers: [] };
-      return { ok: true, json: async () => ({ sessions: recStarted ? [s] : [] }) };
+      return { ok: true, json: async () => ({ sessions: recStarted && !recDeleted ? [s] : [] }) };
     }
     if (url.includes("samples.csv")) return { ok: true, text: async () => CSV_TEXT };
     if (snapshotFn) return { ok: true, json: async () => snapshotFn };
@@ -311,6 +318,12 @@ dom.window.HTMLAnchorElement.prototype.click = function () { csvClicked = true; 
 d.querySelector("#ex").click();
 await sleep(400);
 ok(csvClicked, "CSV export triggered");
+d.querySelector("#session-manager-view [data-del]")?.dispatchEvent(
+  new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+await sleep(100);
+ok(dom.window.getDeleteCalls() === 1 && d.body.textContent.includes("No logs yet")
+  && !d.querySelector("#log-action-error:not([hidden])"),
+  "Delete memakai event delegation dan memuat ulang daftar sesi tanpa window.confirm");
 
 let customLog = false;
 N.addView("log", { label: "Log", order: 10, mount(root) {

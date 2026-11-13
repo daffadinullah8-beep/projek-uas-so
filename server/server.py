@@ -1411,6 +1411,33 @@ def _write_meta(sid):
     with open(_sessions[sid]["dir"] / "meta.json", "w") as f:
         json.dump(_meta(sid), f, indent=1)
 
+def _read_session_meta(directory):
+    candidates = [directory / "meta.json"]
+    candidates.extend(sorted(directory.glob("*.meta.json")))
+    candidates.extend(sorted(directory.glob("*.json")))
+    for meta in dict.fromkeys(candidates):
+        if not meta.is_file():
+            continue
+        try:
+            data = json.loads(meta.read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+async def _remove_session_dir(directory):
+    for attempt in range(5):
+        try:
+            shutil.rmtree(directory)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if os.name != "nt" or attempt == 4:
+                raise
+            await asyncio.sleep(0.1 * (attempt + 1))
+
 async def _record(sid):
     s = _sessions[sid]
     header = ",".join(c for _, c in LOG_COLS)
@@ -1422,7 +1449,10 @@ async def _record(sid):
                 f.write(f"{int(time.time() * 1000)},{row}\n")
             s["samples"] += 1
             _write_meta(sid)
-            await asyncio.sleep(s["iv"])
+            try:
+                await asyncio.wait_for(s["stop_event"].wait(), timeout=s["iv"])
+            except asyncio.TimeoutError:
+                pass
     finally:
         s["status"] = "saved"
         _write_meta(sid)
@@ -1447,8 +1477,9 @@ async def log_start(req: Request):
     csv.write_text(",".join(c for _, c in LOG_COLS) + "\n")
     _sessions[sid] = dict(id=sid, label=label, tag=tag, iv=iv, start=start,
                           dir=d, csv=csv, markers=[], samples=0, rec=True,
-                          status="recording", config=config_snapshot())
-    asyncio.create_task(_record(sid))
+                          status="recording", config=config_snapshot(),
+                          stop_event=asyncio.Event())
+    _sessions[sid]["task"] = asyncio.create_task(_record(sid))
     _write_meta(sid)
     return JSONResponse({"id": sid, "dir": str(d.relative_to(LOGS.parent))})
 
@@ -1458,8 +1489,15 @@ async def log_stop(req: Request):
     sid = int(body.get("id"))
     if sid not in _sessions:
         return JSONResponse({"error": "session tidak ditemukan"}, status_code=404)
-    _sessions[sid]["rec"] = False
-    return JSONResponse({"id": sid, "status": _sessions[sid]["status"], "samples": _sessions[sid]["samples"]})
+    session = _sessions[sid]
+    session["rec"] = False
+    stop_event = session.get("stop_event")
+    if stop_event is not None:
+        stop_event.set()
+    task = session.get("task")
+    if task is not None:
+        await task
+    return JSONResponse({"id": sid, "status": session["status"], "samples": session["samples"]})
 
 @app.post("/api/log/marker")
 async def log_marker(req: Request):
@@ -1486,12 +1524,10 @@ def log_sessions():
         for d in sorted(LOGS.iterdir()):
             if not d.is_dir() or d.name in seen:
                 continue
-            try:
-                m = json.loads((d / "meta.json").read_text())
+            m = _read_session_meta(d)
+            if m is not None:
                 m["dir"] = d.name
                 out.append(m)
-            except Exception:
-                continue
     out.sort(key=lambda m: -m.get("start_ms", 0))
     return JSONResponse({"sessions": out})
 
@@ -1502,38 +1538,43 @@ def log_samples(sid: str):
             return PlainTextResponse(s["csv"].read_text(), media_type="text/csv")
     if LOGS.exists():
         for d in LOGS.iterdir():
-            meta = d / "meta.json"
-            if d.is_dir() and meta.exists():
-                try:
-                    if json.loads(meta.read_text()).get("id") == int(sid):
-                        return PlainTextResponse((d / "samples.csv").read_text(), media_type="text/csv")
-                except Exception:
-                    continue
+            if not d.is_dir():
+                continue
+            meta = _read_session_meta(d)
+            if meta is not None and meta.get("id") == int(sid):
+                samples = next(iter(sorted(d.glob("*.csv"))), None)
+                if samples is not None:
+                    return PlainTextResponse(samples.read_text(), media_type="text/csv")
     return PlainTextResponse("", status_code=404)
 
 @app.delete("/api/log/{sid}")
-def log_delete(sid: str):
+async def log_delete(sid: str):
     target = None
+    active_session = None
     for s in _sessions.values():
         if str(s["id"]) == sid:
             if s["rec"]:
                 return JSONResponse({"error": "masih recording"}, status_code=409)
             target = s["dir"]
-            _sessions.pop(s["id"], None)
+            active_session = s
             break
     if target is None and LOGS.exists():
         for d in LOGS.iterdir():
-            meta = d / "meta.json"
-            if d.is_dir() and meta.exists():
-                try:
-                    if json.loads(meta.read_text()).get("id") == int(sid):
-                        target = d
-                        break
-                except Exception:
-                    continue
+            if not d.is_dir():
+                continue
+            meta = _read_session_meta(d)
+            if meta is not None and meta.get("id") == int(sid):
+                target = d
+                break
     if target is None:
         return JSONResponse({"error": "session tidak ditemukan"}, status_code=404)
-    shutil.rmtree(target)
+    if active_session is not None:
+        task = active_session.get("task")
+        if task is not None:
+            await task
+    await _remove_session_dir(target)
+    if active_session is not None:
+        _sessions.pop(active_session["id"], None)
     return JSONResponse({"deleted": str(target.relative_to(LOGS.parent))})
 
 WEB = BASE.parent / "web"

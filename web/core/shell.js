@@ -225,6 +225,7 @@ const HEADER_TO_KEY={"cpu_temp_c":"cpuT","cpu_power_w":"cpuW","gpu_temp_c":"gT",
 let LOG_METRICS=METRICS;          // [key,label,unit]; diperbarui dari header CSV
 const COL=["--a","--b","--ok","--warn","--bad"];
 let SES=[],sel=new Set(),CSV={},lo={m:"cpuT",trim:0,grp:true,iv:1,lb:"",tg:""};
+const LOG_EVENT_ROOTS=new WeakSet();
 const f2=v=>typeof v==="number"?fx(v,Math.abs(v)<10?2:1):"unavailable";
 function st(a){
   const v=a.filter(x=>typeof x==="number");
@@ -361,22 +362,56 @@ async function exportCsv(){
     a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"})); a.download=s.label+".csv"; a.click();
   }
 }
+function bindLogEvents(root){
+  if(LOG_EVENT_ROOTS.has(root))return;
+  LOG_EVENT_ROOTS.add(root);
+  root.addEventListener("change",e=>{
+    const checkbox=e.target.closest?.("[data-id]");
+    if(!checkbox||!root.contains(checkbox))return;
+    const id=+checkbox.dataset.id;
+    sel.has(id)?sel.delete(id):sel.add(id);
+    renderLog();
+  });
+  root.addEventListener("click",async e=>{
+    const button=e.target.closest?.("[data-del]");
+    if(!button||!root.contains(button)||button.disabled)return;
+    e.preventDefault();
+    const id=+button.dataset.del;
+    if(!Number.isFinite(id))return;
+    button.disabled=true;
+    try{
+      const response=await fetch(`/api/log/${id}`,{method:"DELETE"});
+      if(!response.ok)throw new Error("HTTP "+response.status);
+      sel.delete(id);
+      delete CSV[id];
+      await renderLog();
+    }catch(error){
+      button.disabled=false;
+      const message=root.querySelector("#log-action-error");
+      if(message){
+        message.textContent="Gagal menghapus sesi: "+error.message;
+        message.hidden=false;
+      }
+    }
+  });
+}
 async function renderLog(){
+  const root=$(DOM.session);
+  bindLogEvents(root);
   await loadSessions();
-  const root=$(DOM.session), r=!!rec;
+  const r=!!rec;
   const rows=SES.map(s=>`<tr><td><input type="checkbox" data-id="${s.id}" ${sel.has(s.id)?"checked":""} aria-label="Select ${esc(s.label)}"></td><td>${esc(s.label)}${s.status==="recording"?' <span class="tag">recording</span>':""}</td><td><span class="tag">${esc(s.tag||"none")}</span></td><td>${esc(s.started_iso||String(s.start_ms))}</td><td>${mmss(Math.round(s.samples*(s.interval_s||1)))}</td><td>${s.interval_s} s</td><td>${s.samples}</td><td>${(s.markers||[]).length}</td><td><button class="btn" data-del="${s.id}">Delete</button></td></tr>`).join("");
   root.innerHTML=`<div class="bar-top"><input id="lb" placeholder="Session label" size="22" value="${esc(lo.lb)}"><input id="tg" placeholder="Tag (groups repeated runs)" size="24" value="${esc(lo.tg)}">
     <label>Interval <select id="iv" ${r?"disabled":""}>${[.5,1,5].map(v=>`<option value="${v}" ${v===(r?rec.iv:lo.iv)?"selected":""}>${v} s</option>`).join("")}</select></label>
     <button class="btn ${r?"on":""}" id="rc">${r?"Stop and save":"Start recording"}</button><span class="timer" id="tm">${r?mmss(Math.round((rec.samples||0)*rec.iv)):"00:00"}</span>
     <button class="btn" id="mk" ${r?"":"disabled"}>Add marker${r?" ("+(rec.mk||0)+")":""}</button><span class="grow"></span><button class="btn" id="ex" ${sel.size?"":"disabled"}>Export CSV</button></div>
-    <div class="stack"><section class="p" style="display:block"><h2>Sessions</h2><div class="sub" style="margin:2px 0 16px">${SES.length} tersimpan di server (folder logs/). Interval & marker ikut tersimpan di meta.json.</div>
+    <div id="log-action-error" role="alert" hidden></div>
+    <div class="stack">
+    <section class="p" style="display:block"><h2>Sessions</h2><div class="sub" style="margin:2px 0 16px">${SES.length} tersimpan di server (folder logs/). Interval & marker ikut tersimpan di meta.json.</div>
     ${SES.length?`<table><tr><th></th><th>Name</th><th>Tag</th><th>Started</th><th>Length</th><th>Interval</th><th>Samples</th><th>Markers</th><th></th></tr>${rows}</table>`:`<div class="empty">No logs yet. Start a recording to create one.</div>`}</section>
     <section class="p" style="display:block"><h2>Analysis</h2><div class="sub" id="asub" style="margin:2px 0 16px">0 selected</div><div id="an"><div class="empty">Select one or more sessions above to analyze them.</div></div></section></div>`;
   $(DOM.lb).oninput=e=>lo.lb=e.target.value; $(DOM.tg).oninput=e=>lo.tg=e.target.value; $(DOM.iv).onchange=e=>lo.iv=+e.target.value;
   $(DOM.rc).onclick=toggleRec; $(DOM.ex).onclick=exportCsv; $(DOM.mk).onclick=addMarker;
-  root.querySelectorAll("[data-id]").forEach(c=>c.onchange=()=>{const id=+c.dataset.id;sel.has(id)?sel.delete(id):sel.add(id);renderLog()});
-  root.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.id;
-    await fetch(`/api/log/${id}`,{method:"DELETE"}); sel.delete(id); delete CSV[id]; await loadSessions(); renderLog()});
   const ss=SES.filter(s=>sel.has(s.id));
   $(DOM.asub).textContent=ss.length+" selected";
   if(!ss.length)return;
