@@ -1,3 +1,5 @@
+import contextlib
+import io
 import importlib.util
 import sys
 import unittest
@@ -146,6 +148,17 @@ class WindowsSnapshotTests(unittest.TestCase):
         self.assertIn("gpu_util_percent", meta["columns"])
         self.assertIn("drive0_write_mbps", meta["columns"])
         backend._sessions.pop(7)
+
+class ServerPortTests(unittest.TestCase):
+    def test_port_can_be_configured_by_environment_or_command_line(self):
+        with patch.dict(backend.os.environ, {"AETHER_PORT": "6123"}):
+            self.assertEqual(backend.parse_server_port([]), 6123)
+            self.assertEqual(backend.parse_server_port(["--port", "6124"]), 6124)
+
+    def test_port_must_be_in_tcp_range(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                backend.parse_server_port(["--port", "70000"])
 
 
 if __name__ == "__main__":

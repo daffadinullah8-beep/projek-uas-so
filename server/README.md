@@ -13,6 +13,11 @@ cd server
 .venv/bin/python server.py --check  # diagnosis sumber per metrik (available/unavailable + alasan)
 ```
 
+Server memakai port `5130` secara default; atur `AETHER_PORT` atau jalankan
+`python server.py --port <port>` untuk memilih port lain. Electron mencoba
+`5130` terlebih dahulu, lalu memilih port localhost yang tersedia bila port
+tersebut sedang digunakan.
+
 Daya CPU via RAPL butuh akses baca `energy_uj` (mode 0400 — kernel membatasinya
 sejak PLATYPUS; **jangan** chmod world-readable). Dua cara yang dipakai:
 

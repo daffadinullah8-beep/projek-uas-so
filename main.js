@@ -1,16 +1,61 @@
 const { app, BrowserWindow, dialog, ipcMain } = require("electron");
-const { execFileSync, spawn } = require("child_process");
+const { execFile, execFileSync, spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 const path = require("path");
 
-const PORT = 5130;
-const URL = `http://127.0.0.1:${PORT}/`;
-const APP_URL = process.env.NOTERRA_DEMO_MODE === "1" ? `${URL}?mock=1` : URL;
+const DEFAULT_PORT = 5130;
+const SHUTDOWN_GRACE_MS = 1200;
 
 let backend = null;
+let backendPort = null;
+let backendStopPromise = null;
+let quitting = false;
 let mainWindow = null;
 const backendLogs = [];
+
+function canBindPort(port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", error => {
+      if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+        resolve(false);
+      } else {
+        reject(error);
+      }
+    });
+    server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+      server.close(error => error ? reject(error) : resolve(true));
+    });
+  });
+}
+
+async function findFreePort() {
+  if (await canBindPort(DEFAULT_PORT)) return DEFAULT_PORT;
+
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Tidak dapat membaca port backend yang tersedia.")));
+        return;
+      }
+      server.close(error => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
+
+function backendUrl(port) {
+  return `http://127.0.0.1:${port}/`;
+}
+
+function appUrl(port) {
+  const url = backendUrl(port);
+  return process.env.NOTERRA_DEMO_MODE === "1" ? `${url}?mock=1` : url;
+}
 
 function getBackendLogPath() {
   const logDir = path.join(app.getPath("userData"), "logs");
@@ -105,7 +150,7 @@ function pythonCommand(root) {
   };
 }
 
-function startBackend(root) {
+function startBackend(root, port) {
   if (backend && backend.exitCode === null) return backend;
 
   let command;
@@ -135,12 +180,16 @@ function startBackend(root) {
     ];
   }
 
+  env.AETHER_PORT = String(port);
   backend = spawn(command, args, {
     cwd: root,
     env: { ...env, PYTHONUNBUFFERED: "1" },
     stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true
+    windowsHide: true,
+    detached: process.platform !== "win32"
   });
+  const child = backend;
+  backendPort = port;
 
   recordBackendLog("SYSTEM", `Menjalankan backend: ${command} ${args.join(" ")}`);
 
@@ -160,12 +209,15 @@ function startBackend(root) {
     const exitMsg = `Aether OS backend berhenti (code=${code}, signal=${signal}).`;
     console.log(exitMsg);
     recordBackendLog("SYSTEM", exitMsg);
-    backend = null;
+    if (backend === child) {
+      backend = null;
+      backendPort = null;
+    }
   });
   return backend;
 }
 
-function waitForBackend(child, timeoutMs = 30000) {
+function waitForBackend(child, port, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     let settled = false;
@@ -195,7 +247,7 @@ function waitForBackend(child, timeoutMs = 30000) {
 
     const probe = () => {
       if (settled) return;
-      const request = http.get(URL, response => {
+      const request = http.get(`${backendUrl(port)}api/health`, response => {
         response.resume();
         if (response.statusCode && response.statusCode < 500) {
           finish();
@@ -221,14 +273,125 @@ function waitForBackend(child, timeoutMs = 30000) {
   });
 }
 
-function stopBackend() {
-  if (!backend) return;
-  const child = backend;
-  backend = null;
-  if (child.exitCode === null && !child.killed) child.kill();
+function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const finish = exited => {
+      clearTimeout(timer);
+      child.removeListener("exit", onExit);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.once("exit", onExit);
+  });
 }
 
-async function createWindow(root) {
+function delay(timeoutMs) {
+  return new Promise(resolve => setTimeout(resolve, timeoutMs));
+}
+
+function signalProcessGroup(pid, signal) {
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch (error) {
+    if (error.code === "ESRCH") return false;
+    throw error;
+  }
+}
+
+function processGroupExists(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    if (error.code === "ESRCH") return false;
+    if (error.code === "EPERM") return true;
+    throw error;
+  }
+}
+
+async function waitForProcessGroupExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (processGroupExists(pid) && Date.now() < deadline) {
+    await delay(50);
+  }
+  return !processGroupExists(pid);
+}
+
+function taskkillProcessTree(pid) {
+  return new Promise((resolve, reject) => {
+    execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true },
+      (error, _stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr.trim() || error.message));
+        } else {
+          resolve();
+        }
+      });
+  });
+}
+
+async function stopWindowsBackend(child) {
+  try {
+    await taskkillProcessTree(child.pid);
+  } catch (error) {
+    if (!await waitForChildExit(child, 500)) {
+      child.kill();
+      await waitForChildExit(child, 2000);
+      throw new Error(`taskkill gagal menghentikan backend: ${error.message}`);
+    }
+  }
+  if (!await waitForChildExit(child, 3000)) {
+    child.kill();
+    if (!await waitForChildExit(child, 2000)) {
+      throw new Error(`Backend PID ${child.pid} tidak berhenti setelah taskkill.`);
+    }
+  }
+}
+
+async function stopUnixBackend(child) {
+  signalProcessGroup(child.pid, "SIGTERM");
+  await waitForProcessGroupExit(child.pid, SHUTDOWN_GRACE_MS);
+  if (processGroupExists(child.pid)) {
+    signalProcessGroup(child.pid, "SIGKILL");
+  }
+  const [childExited, groupExited] = await Promise.all([
+    waitForChildExit(child, 3000),
+    waitForProcessGroupExit(child.pid, 3000)
+  ]);
+  if (!childExited || !groupExited) {
+    throw new Error(`Process backend atau child process group ${child.pid} tidak berhenti.`);
+  }
+}
+
+function stopBackend() {
+  if (backendStopPromise) return backendStopPromise;
+  if (!backend) return Promise.resolve();
+
+  const child = backend;
+  backend = null;
+  backendPort = null;
+  backendStopPromise = (async () => {
+    if (!child.pid) return;
+    recordBackendLog("SYSTEM", `Menghentikan backend PID ${child.pid} dan child process.`);
+    if (process.platform === "win32") {
+      await stopWindowsBackend(child);
+    } else {
+      await stopUnixBackend(child);
+    }
+    recordBackendLog("SYSTEM", `Backend PID ${child.pid} beserta process group berhenti.`);
+  })().catch(error => {
+    recordBackendLog("ERROR", `Gagal menghentikan backend: ${error.message}`);
+    throw error;
+  }).finally(() => {
+    backendStopPromise = null;
+  });
+  return backendStopPromise;
+}
+
+async function createWindow(root, port) {
   const iconPath = process.platform === "win32"
     ? path.join(root, "assets", "icon.ico")
     : path.join(root, "assets", "icon.png");
@@ -254,40 +417,61 @@ async function createWindow(root) {
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
   });
-  await win.loadURL(APP_URL);
+  await win.loadURL(appUrl(port));
+}
+
+async function startBackendAndWindow() {
+  if (backendStopPromise) await backendStopPromise;
+  const root = findProjectRoot();
+  let child = backend;
+  let port = backendPort;
+  if (!child || child.exitCode !== null) {
+    port = await findFreePort();
+    child = startBackend(root, port);
+  }
+  await waitForBackend(child, port);
+  await createWindow(root, port);
 }
 
 app.whenReady().then(async () => {
   try {
-    const root = findProjectRoot();
-    const child = startBackend(root);
-    await waitForBackend(child);
-    await createWindow(root);
+    await startBackendAndWindow();
   } catch (error) {
     console.error("Aether OS desktop gagal dimulai:", error);
     dialog.showErrorBox("Aether OS", error.message);
-    stopBackend();
+    try {
+      await stopBackend();
+    } catch (stopError) {
+      console.error("Gagal membersihkan backend saat startup gagal:", stopError);
+    }
     app.quit();
   }
 });
 
 app.on("window-all-closed", () => {
-  stopBackend();
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("activate", async () => {
   if (BrowserWindow.getAllWindows().length !== 0) return;
   try {
-    const root = findProjectRoot();
-    const child = startBackend(root);
-    await waitForBackend(child);
-    await createWindow(root);
+    await startBackendAndWindow();
   } catch (error) {
     console.error("Aether OS desktop gagal dibuka kembali:", error);
     dialog.showErrorBox("Aether OS", error.message);
-    stopBackend();
+    try {
+      await stopBackend();
+    } catch (stopError) {
+      console.error("Gagal membersihkan backend setelah gagal membuka jendela:", stopError);
+    }
   }
 });
 
-app.on("before-quit", stopBackend);
+app.on("before-quit", event => {
+  if (quitting || (!backend && !backendStopPromise)) return;
+  event.preventDefault();
+  quitting = true;
+  stopBackend().catch(error => {
+    console.error("Gagal menghentikan backend saat aplikasi ditutup:", error);
+  }).finally(() => app.quit());
+});

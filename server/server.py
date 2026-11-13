@@ -1636,6 +1636,16 @@ def run_check():
     print(f"\n{len(rows)} metric keys: {len(rows) - bad} available, {bad} unavailable")
     return 0
 
+def parse_server_port(argv=None):
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Start the Aether OS telemetry backend.")
+    parser.add_argument("--port", type=int, default=os.environ.get("AETHER_PORT", "5130"))
+    port = parser.parse_args(argv).port
+    if not 1 <= port <= 65535:
+        parser.error("--port must be between 1 and 65535")
+    return port
+
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
@@ -1704,4 +1714,4 @@ if __name__ == "__main__":
 
     import uvicorn
     # log_config=None mencegah crash saat dijalankan tanpa console / stream yang di-redirect
-    uvicorn.run(app, host="127.0.0.1", port=5130, log_config=None)
+    uvicorn.run(app, host="127.0.0.1", port=parse_server_port(), log_config=None)
