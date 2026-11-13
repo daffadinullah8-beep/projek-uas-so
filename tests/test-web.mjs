@@ -42,8 +42,8 @@ const HEALTH = { ok: true, nvml: false, items: {
   ramBW: "PMU IMC ada tapi perf diblokir kernel.perf_event_paranoid=4",
   pcieGen: "NVML dan sysfs tidak terbaca",
   cpuT: "hwmon coretemp tidak terbaca" } };
-const CSV_TEXT = "timestamp_ms,cpu_temp_c,cpu_power_w,gpu_temp_c,gpu_power_w,vram_bw_gbs,pcie_rx_gbs,mem_major_faults_s,nvme0_read_mbps\n" +
-  Array.from({ length: 12 }, (_, i) => `1793000000000,${60 + i}.000,,61.000,15.000,0.000,0.164,10.000,0.000`).join("\n") + "\n";
+const CSV_TEXT = "timestamp_ms,cpu_temp_c,cpu_power_w,gpu_temp_c,gpu_power_w,vram_bw_gbs,pcie_rx_gbs,mem_major_faults_s,nvme0_read_mbps,cpu_util_percent,gpu_util_percent,ram_used_gib,drive0_write_mbps\n" +
+  Array.from({ length: 12 }, (_, i) => `1793000000000,${60 + i}.000,,61.000,15.000,0.000,0.164,10.000,0.000,${20 + i}.000,${30 + i}.000,4.000,1.000`).join("\n") + "\n";
 const SESSION = { id: 1793000000000, label: "rec-test", tag: "none", interval_s: 1,
   start_ms: Date.now(), started_iso: "2026-10-30T10:26:56+0700",
   config: { governor: "powersave", epp: "balance_performance", turbo: "on",
@@ -285,6 +285,13 @@ await sleep(600);
 ok(d.body.textContent.includes("1 tersimpan di server"), "session persisted on server with samples");
 ok(d.body.textContent.includes("Mean"), "statistics table shown");
 ok(d.body.textContent.includes("65.5"), "mean CPU temp dari CSV server (60..71 → 65.5)");
+const metricSelect = d.querySelector("#mt");
+ok([...metricSelect.options].some(option => option.value === "cpuU"),
+  "CSV sesi Windows memuat metrik utilisasi CPU");
+metricSelect.value = "cpuU";
+metricSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+await sleep(80);
+ok(d.body.textContent.includes("25.5"), "mean utilisasi CPU dihitung dari CSV sesi lintas OS");
 dom.window.URL.createObjectURL = () => "blob:fake";
 let csvClicked = false;
 dom.window.HTMLAnchorElement.prototype.click = function () { csvClicked = true; };
@@ -414,6 +421,37 @@ ok(CORE_CSS.includes("#nav .foot")
   && !NEON_CSS.includes(":root[data-theme=\"neon\"] body:not(.hud-active) > #nav"),
   "semua tema memakai baris header inti yang sama");
 neon.window.close();
+
+/* ---- telemetry Windows tetap live dan memakai label logical CPU ---- */
+const windowsSnapshot = {
+  ...base,
+  cpuU: 41,
+  pu: [20, 45, 58],
+  pf: [2.4, 2.8, 3.1],
+  pt: [null, null, null],
+  eu: [], ef: [], et: [],
+  snap: {
+    ...base.snap,
+    platform: "Windows",
+    osName: "Windows 11",
+    cpuModel: "Test CPU",
+    cpuLogical: 3,
+    cpuCoreType: "logical",
+  },
+};
+const win = domFor(SHELL, { url: "http://localhost/?theme=default",
+  resources: { interceptors: [fileInterceptor] }, snapshot: windowsSnapshot });
+const dw = win.window.document;
+await sleep(2200);
+const windowsCpuCard = dw.querySelector(".dash > .card");
+ok(dw.querySelector("#status")?.textContent.includes("live"),
+  "Windows telemetry tidak otomatis memakai data demo");
+ok(windowsCpuCard?.querySelector(".subt")?.textContent.includes("3 logical CPUs"),
+  "default theme menampilkan jumlah logical CPU Windows");
+ok([...windowsCpuCard.querySelectorAll(".row span")].map(el => el.textContent).join(",")
+  === "Logical CPU avg,Average CPU clock,Temperature",
+  "default theme memakai label CPU Windows yang tidak mengasumsikan P/E core");
+win.window.close();
 
 dom.window.close();
 console.log("ALL PASS");

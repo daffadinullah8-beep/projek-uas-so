@@ -28,11 +28,28 @@ Server melayani frontend di `/`, polled endpoint `GET /api/snapshot`
 `GET /api/health` (alasan tiap metrik yang unavailable), dan endpoint recording
 `POST /api/log/start|stop|marker`, `GET /api/log/sessions`,
 `GET /api/log/<id>/samples.csv`, `DELETE /api/log/<id>`. Recording persisten di
-repo: `logs/<tanggal>_<label>/samples.csv` + `meta.json` schema v1 (label, tag,
+repo: `logs/<tanggal>_<label>/samples.csv` + `meta.json` schema v2 (label, tag,
 interval_s, snapshot konfigurasi saat sesi mulai — governor/EPP/turbo/power
 limit/sysctl/kernel/driver, marker, status). Sample unavailable ditulis kosong
 di CSV, bukan 0. Pada aplikasi Electron terpaket, rekaman disimpan pada folder
 `logs` di direktori data pengguna aplikasi agar tetap bisa ditulis dari AppImage.
+
+## Collector Windows
+
+Windows menggunakan `psutil` untuk CPU usage per logical processor, frekuensi
+CPU jika tersedia, penggunaan RAM/swap, context switches, interrupts, dan
+counter I/O per physical disk. CIM Windows mengisi identitas model komputer,
+CPU, GPU, versi driver GPU, serta disk pada metadata sesi; versi driver NVML
+diprioritaskan bila tersedia. Suhu/daya CPU, CPU P/E grouping, idle residency,
+CPU power limits, serta disk utilization/temperature yang tidak dapat dibaca
+dari sumber ini tetap `unavailable`; nilainya tidak diganti data demo.
+
+Mode demo hanya aktif bila URL memakai `?mock=1`. Pada aplikasi Electron,
+mode demo dapat dipilih eksplisit dengan `NOTERRA_DEMO_MODE=1`. Rekaman sesi
+schema v2 mencatat platform, versi OS, nama/model perangkat, CPU/GPU, dan
+menambahkan kolom CPU utilization/clock, GPU utilization, kapasitas/pemakaian
+RAM, swap, context switches, serta disk read/write/IOPS. Data dari sesi schema
+v1 tetap dapat dibuka.
 
 ## Sumber metrik
 

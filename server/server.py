@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Lovelace — noterra monitoring backend.
+"""Lovelace — Aether OS hardware monitoring backend.
 
 Serves the web/ shell (GET /), core+theme static files (mount), /api/themes,
-/api/snapshot, and mock routes (?mock=1 di UI). Every metric is read from real
-sources (/proc, /sys, NVML). Anything that cannot be read is returned as null;
-the UI renders null as "unavailable". Nothing is guessed. Mock routes hanya
-membaca server/fixtures/snapshot-sample.json — tidak menyentuh hardware.
+/api/snapshot, and mock routes (?mock=1 di UI). Linux uses /proc, /sys, and
+NVML; Windows uses psutil, CIM, and NVML when available. Metrics without a
+source are returned as null; the UI renders them as "unavailable". Mock routes
+read server/fixtures/snapshot-sample.json and do not touch hardware.
 
-Run:  .venv/bin/python server.py   (serves http://127.0.0.1:5130)
+Run:  python server.py   (serves http://127.0.0.1:5130)
 """
 import asyncio
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import time
+from functools import lru_cache
 from pathlib import Path
 
 import psutil
@@ -85,6 +87,7 @@ _state = {}      # previous cumulative counters
 _last_t = None   # previous sample time (monotonic)
 
 _health = {}     # metric key -> None (available) or a reason string for unavailable
+_win_cpu_ready = False
 
 def avail(key, reason=None):
     """Record availability of a metric key; reason explains why it is null."""
@@ -758,10 +761,18 @@ def gpu_metrics():
             avail("gbw", f"NVML nvmlDeviceGetMemoryBusWidth: {e}")
             avail("gpeak", f"NVML nvmlDeviceGetMemoryBusWidth: {e}")
     else:
+        reason = ("NVML tidak tersedia; telemetry GPU NVIDIA memerlukan driver NVIDIA "
+                  "yang aktif di Windows" if platform.system() == "Windows" else
+                  "NVML init gagal (Driver Not Loaded): /dev/nvidia* tidak terlihat; "
+                  "jalankan server di host atau dengan akses device node")
         for k in keys:
-            avail(k, "NVML init gagal (Driver Not Loaded): /dev/nvidia* tidak terlihat; "
-                     "jalankan server di host atau dengan akses device node")
-    if out["pcieGen"] is None:  # sysfs fallback, works without NVML device nodes
+            avail(k, reason)
+    if out["pcieGen"] is None and platform.system() == "Windows":
+        reason = "link PCIe GPU tidak tersedia dari NVML di Windows"
+        avail("pcieGen", reason)
+        avail("pcieWidth", reason)
+        avail("pcieMax", reason)
+    elif out["pcieGen"] is None:  # sysfs fallback, works without NVML device nodes
         pci = pci_display()
         if pci is None:
             avail("pcieGen", "NVML tidak tersedia dan tidak ada PCI display controller di sysfs")
@@ -805,7 +816,98 @@ def gpu_metrics():
 
 # ---- system snapshot --------------------------------------------------------
 
+@lru_cache(maxsize=1)
+def windows_system_info():
+    """Read stable Windows hardware identity once; live counters use psutil."""
+    command = (
+        "$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name; "
+        "$sys = Get-CimInstance Win32_ComputerSystem; "
+        "$gpuAdapters = @(Get-CimInstance Win32_VideoController | ForEach-Object { "
+        "[pscustomobject]@{ Name = $_.Name; DriverVersion = $_.DriverVersion } }); "
+        "$gpus = @($gpuAdapters | ForEach-Object { $_.Name }); "
+        "$gpuDrivers = @($gpuAdapters | ForEach-Object { $_.DriverVersion }); "
+        "$disks = @(Get-CimInstance Win32_DiskDrive | ForEach-Object { "
+        "[pscustomobject]@{ DeviceID = $_.DeviceID; Model = $_.Model; Size = $_.Size } }); "
+        "[pscustomobject]@{ cpuModel = $cpu; manufacturer = $sys.Manufacturer; "
+        "deviceModel = $sys.Model; gpuNames = $gpus; gpuDrivers = $gpuDrivers; "
+        "disks = $disks } | ConvertTo-Json -Compress -Depth 4"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+             "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); " + command],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=8
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or "perintah CIM gagal").strip()
+            return {}, f"Windows hardware inventory gagal: {detail[:240]}"
+        data = json.loads(result.stdout)
+        if not isinstance(data, dict):
+            return {}, "Windows hardware inventory menghasilkan data yang tidak valid"
+        if isinstance(data.get("gpuNames"), str):
+            data["gpuNames"] = [data["gpuNames"]]
+        if isinstance(data.get("gpuDrivers"), str):
+            data["gpuDrivers"] = [data["gpuDrivers"]]
+        if isinstance(data.get("disks"), dict):
+            data["disks"] = [data["disks"]]
+        return data, None
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        return {}, f"Windows hardware inventory gagal: {error}"
+
+def windows_system_snap():
+    info, warning = windows_system_info()
+    release, version, _csd, _ptype = platform.win32_ver()
+    memory = psutil.virtual_memory()
+    gpu_driver = None
+    gpu_driver_warning = None
+    if NVML:
+        try:
+            gpu_driver = pynvml.nvmlSystemGetDriverVersion()
+            if isinstance(gpu_driver, bytes):
+                gpu_driver = gpu_driver.decode("utf-8", errors="replace")
+        except pynvml.NVMLError as error:
+            gpu_driver_warning = f"NVML driver version gagal dibaca: {error}"
+    if gpu_driver is None:
+        gpu_drivers = info.get("gpuDrivers") or []
+        gpu_driver = gpu_drivers[0] if gpu_drivers else None
+    if isinstance(gpu_driver, bytes):
+        gpu_driver = gpu_driver.decode("utf-8", errors="replace")
+    if isinstance(gpu_driver, str):
+        gpu_driver = gpu_driver.strip() or None
+    if gpu_driver is not None:
+        gpu_driver_warning = None
+    return {
+        "platform": "Windows",
+        "osName": f"Windows {release}".strip(),
+        "osVersion": version or platform.version(),
+        "hostname": platform.node() or None,
+        "manufacturer": (info.get("manufacturer") or "").strip() or None,
+        "deviceModel": (info.get("deviceModel") or "").strip() or None,
+        "cpuModel": ((info.get("cpuModel") or platform.processor() or "").strip() or None),
+        "cpuLogical": psutil.cpu_count(logical=True),
+        "cpuPhysical": psutil.cpu_count(logical=False),
+        "cpuCoreType": "logical",
+        "memoryTotalGiB": memory.total / 1024**3,
+        "gpuNames": [name.strip() for name in info.get("gpuNames") or [] if name and name.strip()],
+        "gpuDetectionAvailable": warning is None,
+        "systemInfoWarning": warning,
+        "gpuDriverWarning": gpu_driver_warning,
+        "kernel": platform.version(),
+        "driver": None,
+        "gpuDriver": gpu_driver,
+        "governor": None,
+        "epp": None,
+        "turbo": None,
+        "pinning": None,
+        "thp": None,
+        "swappiness": None,
+        "nvml": NVML,
+    }
+
 def system_snap():
+    if platform.system() == "Windows":
+        return windows_system_snap()
+
     cpus = list(Path("/sys/devices/system/cpu").glob("cpu[0-9]*"))
     gov = sorted({rd(f"{d}/cpufreq/scaling_governor") for d in cpus} - {None})
     epp = sorted({rd(f"{d}/cpufreq/energy_performance_preference") for d in cpus} - {None})
@@ -821,9 +923,24 @@ def system_snap():
             model = ln.split(":")[1].strip()
             break
     pin = rd("/sys/fs/cgroup/cpuset.cpus.effective")
+    os_release = {}
+    for line in lines("/etc/os-release"):
+        if "=" in line:
+            key, value = line.split("=", 1)
+            os_release[key] = value.strip().strip('"')
     return {
+        "platform": platform.system(),
+        "osName": os_release.get("PRETTY_NAME"),
+        "osVersion": platform.release(),
+        "hostname": platform.node() or None,
+        "manufacturer": rd("/sys/devices/virtual/dmi/id/sys_vendor"),
+        "deviceModel": rd("/sys/devices/virtual/dmi/id/product_name"),
         "kernel": os.uname().release,
         "cpuModel": model,
+        "cpuLogical": psutil.cpu_count(logical=True),
+        "cpuPhysical": psutil.cpu_count(logical=False),
+        "cpuCoreType": "frequency-clustered",
+        "memoryTotalGiB": psutil.virtual_memory().total / 1024**3,
         "driver": f"intel_pstate ({status})" if status else None,
         "gpuDriver": nv_m.group(1) if nv_m else None,
         "governor": ", ".join(gov) if gov else None,
@@ -839,6 +956,17 @@ def config_snapshot():
     """Snapshot konfigurasi saat sesi mulai (spec 6.3): governor/EPP/turbo/power
     limit/sysctl terkait/kernel param/versi driver. Nilai tanpa sumber = null."""
     cfg = system_snap()
+    gpu = gpu_metrics()
+    cfg["gpuName"] = gpu["name"] or ", ".join(cfg.get("gpuNames") or []) or None
+    cfg["gpuPowerLimitW"] = gpu["gLim"]
+    if platform.system() == "Windows":
+        cfg["sysctl"] = {}
+        cfg["kernelCmdline"] = None
+        cfg["powerLimits"] = {"pl1W": None, "pl2W": None, "peakW": None}
+        cfg["gpuClockLock"] = None
+        cfg["strata"] = None
+        return cfg
+
     sysctl = {}
     for p in ("kernel/perf_event_paranoid", "vm/swappiness", "vm/dirty_ratio",
               "vm/dirty_background_ratio"):
@@ -847,7 +975,6 @@ def config_snapshot():
     cfg["kernelCmdline"] = (rd("/proc/cmdline") or "")[:200] or None
     lim = rapl_limits()
     cfg["powerLimits"] = {"pl1W": lim.get("pl1"), "pl2W": lim.get("pl2"), "peakW": lim.get("plpeak")}
-    cfg["gpuPowerLimitW"] = gpu_metrics()["gLim"]
     cfg["gpuClockLock"] = None      # NVML tidak menyediakan status clock lock di mesin ini
     cfg["strata"] = None            # adapter Strata belum ada → null (bukan angka karangan)
     return cfg
@@ -867,11 +994,248 @@ def sync_health(data):
         else:
             _health[k] = None
 
+def windows_drive_metrics(dt):
+    rows = []
+    info, info_warning = windows_system_info()
+    models = {}
+    for disk in info.get("disks") or []:
+        device_id = str(disk.get("DeviceID") or "").upper().replace("\\\\.\\", "")
+        models[device_id] = disk
+
+    try:
+        counters = psutil.disk_io_counters(perdisk=True) or {}
+    except (psutil.Error, OSError, RuntimeError) as error:
+        counters = {}
+        counter_warning = f"Windows disk I/O counters gagal dibaca: {error}"
+    else:
+        counter_warning = "Windows tidak melaporkan counter I/O per physical drive"
+
+    for idx, (dev, counter) in enumerate(sorted(counters.items(), key=lambda item: item[0].lower())):
+        keys = {
+            "r": f"r{idx}", "w": f"w{idx}", "ops": f"i{idx}", "a": f"a{idx}",
+            "u": f"u{idx}", "q": f"q{idx}", "temp": f"t{idx}",
+        }
+        prefix = f"win:disk:{dev}:"
+        read_bytes = rate(prefix + "read_bytes", counter.read_bytes, dt)
+        write_bytes = rate(prefix + "write_bytes", counter.write_bytes, dt)
+        read_count = rate(prefix + "read_count", counter.read_count, dt)
+        write_count = rate(prefix + "write_count", counter.write_count, dt)
+        read_time = rate(prefix + "read_time", counter.read_time, dt)
+        write_time = rate(prefix + "write_time", counter.write_time, dt)
+        ops = read_count + write_count if read_count is not None and write_count is not None else None
+        response_ms = read_time + write_time if read_time is not None and write_time is not None else None
+        await_ms = response_ms / ops if response_ms is not None and ops else None
+
+        device_info = models.get(dev.upper(), {})
+        try:
+            size_gb = int(device_info["Size"]) / 1e9 if device_info.get("Size") else None
+        except (TypeError, ValueError):
+            size_gb = None
+        out = {
+            "dev": dev,
+            "model": device_info.get("Model"),
+            "sizeGB": size_gb,
+            "r": read_bytes / 1e6 if read_bytes is not None else None,
+            "w": write_bytes / 1e6 if write_bytes is not None else None,
+            "ops": ops,
+            "a": await_ms,
+            "idle": ops == 0,
+            "u": None,
+            "q": None,
+            "temp": None,
+            "link": None,
+            "linkMax": None,
+            "sched": None,
+            "readahead": None,
+            "capUsed": None,
+            "mount": None,
+        }
+        for metric, key in keys.items():
+            if out[metric] is not None:
+                avail(key)
+            elif metric == "a" and out["idle"]:
+                avail(key, "")
+            elif metric in ("r", "w", "ops", "a"):
+                avail(key, PENDING if dt is None else counter_warning)
+            elif metric == "u":
+                avail(key, "utilisasi per physical drive tidak tersedia dari counter Windows psutil")
+            elif metric == "q":
+                avail(key, "queue depth per physical drive tidak tersedia dari counter Windows psutil")
+            else:
+                avail(key, "sensor suhu disk tidak tersedia dari counter Windows psutil")
+        for metric, suffix in (("model", "model"), ("sizeGB", "size"), ("sched", "scheduler"),
+                               ("readahead", "readahead"), ("capUsed", "capacity"),
+                               ("link", "link"), ("linkMax", "linkMax")):
+            if out[metric] is None:
+                reason = info_warning or f"Windows CIM tidak menyediakan metadata disk {dev}"
+                if metric in ("sched", "readahead", "link", "linkMax"):
+                    reason = f"{metric} per physical drive tidak tersedia dari Windows"
+                avail(f"d{idx}{suffix}", reason)
+            else:
+                avail(f"d{idx}{suffix}")
+        rows.append(out)
+
+    if not rows:
+        reason = counter_warning
+        for key in ("r0", "w0", "i0", "a0", "u0", "q0", "t0"):
+            avail(key, reason)
+    return rows
+
+def build_windows_snapshot(dt):
+    global _win_cpu_ready
+    try:
+        cpu_values = psutil.cpu_percent(interval=None, percpu=True)
+    except (psutil.Error, OSError, RuntimeError) as error:
+        cpu_values = []
+        avail("cpuU", f"Windows CPU usage gagal dibaca: {error}")
+    if not cpu_values:
+        cpu_util = None
+        avail("cpuU", "Windows tidak melaporkan logical processor usage")
+    elif not _win_cpu_ready:
+        cpu_util = None
+        cpu_values = [None] * len(cpu_values)
+        _win_cpu_ready = True
+        avail("cpuU", PENDING)
+    else:
+        cpu_util = sum(cpu_values) / len(cpu_values)
+        avail("cpuU")
+    if any(value is not None for value in cpu_values):
+        avail("pu")
+    else:
+        avail("pu", "logical processor usage menunggu snapshot berikutnya")
+
+    try:
+        frequencies = psutil.cpu_freq(percpu=True) or []
+    except (psutil.Error, OSError, RuntimeError, NotImplementedError) as error:
+        frequencies = []
+        avail("pfa", f"Windows CPU frequency gagal dibaca: {error}")
+    cpu_freq = [
+        item.current / 1000 if item.current and item.current > 0 else None
+        for item in frequencies
+    ]
+    max_frequencies = [
+        item.max / 1000 if item.max and item.max > 0 else None
+        for item in frequencies
+    ]
+    cpu_count = len(cpu_values) or psutil.cpu_count(logical=True) or 0
+    cpu_freq = (cpu_freq + [None] * cpu_count)[:cpu_count]
+    available_freqs = [value for value in cpu_freq if value is not None]
+    pfa = sum(available_freqs) / len(available_freqs) if available_freqs else None
+    available_max_freqs = [value for value in max_frequencies if value is not None]
+    pfa_max = max(available_max_freqs) if available_max_freqs else None
+    if available_freqs:
+        avail("pf")
+        avail("pfa")
+    else:
+        avail("pf", "Windows tidak melaporkan frekuensi logical CPU melalui psutil")
+        avail("pfa", "Windows tidak melaporkan frekuensi CPU melalui psutil")
+    if pfa_max is None:
+        avail("pfaMax", "Windows tidak melaporkan frekuensi maksimum CPU melalui psutil")
+    else:
+        avail("pfaMax")
+    avail("pt", "Windows tidak menyediakan sensor suhu CPU melalui psutil")
+
+    try:
+        cpu_stats = psutil.cpu_stats()
+        ctxt = rate("win:ctx", cpu_stats.ctx_switches, dt)
+        irq = rate("win:irq", cpu_stats.interrupts, dt)
+        avail("ctx", PENDING if ctxt is None else None)
+        avail("irq", PENDING if irq is None else None)
+    except (psutil.Error, OSError, RuntimeError, AttributeError) as error:
+        ctxt = irq = None
+        avail("ctx", f"Windows CPU counters gagal dibaca: {error}")
+        avail("irq", f"Windows CPU counters gagal dibaca: {error}")
+
+    try:
+        memory = psutil.virtual_memory()
+        mem_total = memory.total / 1024**3
+        ram_used = (memory.total - memory.available) / 1024**3
+        mem_avail = memory.available / 1024**3
+        avail("memTot"); avail("ramU"); avail("avail")
+    except (psutil.Error, OSError, RuntimeError, AttributeError) as error:
+        mem_total = ram_used = mem_avail = None
+        avail("memTot", f"Windows memory counters gagal dibaca: {error}")
+        avail("ramU", f"Windows memory counters gagal dibaca: {error}")
+        avail("avail", f"Windows memory counters gagal dibaca: {error}")
+    avail("cache", "psutil Windows API tidak menyediakan system page cache")
+    try:
+        swap = psutil.swap_memory()
+        swap_total = swap.total / 1024**3
+        swap_used = swap.used / 1024**3
+        avail("swapTot"); avail("swapU")
+    except (psutil.Error, OSError, RuntimeError, AttributeError) as error:
+        swap_total = swap_used = None
+        avail("swapTot", f"Windows swap counters gagal dibaca: {error}")
+        avail("swapU", f"Windows swap counters gagal dibaca: {error}")
+
+    avail("cpuT", "sensor suhu CPU tidak tersedia melalui psutil pada Windows")
+    avail("cpuW", "CPU package power tidak tersedia melalui psutil pada Windows")
+    avail("migr", "counter system-wide CPU migration tidak tersedia melalui Windows psutil")
+    avail("idle", "idle residency tidak tersedia melalui Windows psutil")
+    avail("idleName", "nama idle state tidak tersedia melalui Windows psutil")
+    avail("cpuThr", "CPU thermal throttling tidak tersedia melalui Windows psutil")
+    for key in ("pl1", "pl2", "plPeak"):
+        avail(key, "CPU power limits tidak tersedia melalui Windows psutil")
+    avail("majF", "system page faults tidak tersedia melalui Windows psutil")
+    avail("minF", "system page faults tidak tersedia melalui Windows psutil")
+    avail("swp", "system swap I/O throughput tidak tersedia melalui Windows psutil")
+    avail("ramBW", "PMU memory bandwidth tidak tersedia melalui Windows collector")
+
+    drives = windows_drive_metrics(dt)
+    gpu = gpu_metrics()
+    snap = system_snap()
+    snap["gpuName"] = gpu["name"] or ", ".join(snap.get("gpuNames") or []) or None
+    snap["gpuPresent"] = bool(snap.get("gpuNames")) or bool(gpu["name"])
+    snap["drivesFound"] = len(drives)
+    if not snap["gpuDetectionAvailable"]:
+        avail("gpuPresent", snap["systemInfoWarning"])
+
+    def drive_view(drive):
+        return {"dev": drive.get("dev"), "name": drive.get("model"), "sizeGB": drive.get("sizeGB"),
+                "link": drive.get("link"), "linkMax": drive.get("linkMax"), "sched": drive.get("sched"),
+                "readahead": drive.get("readahead"), "capUsed": drive.get("capUsed"),
+                "mount": drive.get("mount")}
+
+    data = {
+        "cpuT": None, "cpuW": None, "cpuU": cpu_util,
+        "pfa": pfa, "pfaMax": pfa_max, "pu": cpu_values, "pf": cpu_freq, "pt": [None] * len(cpu_values),
+        "eu": [], "ef": [], "et": [],
+        "ctx": ctxt, "migr": None, "irq": irq, "idle": None, "idleName": None,
+        "cpuThr": None, "pl1": None, "pl2": None, "plPeak": None,
+        "gT": gpu["gT"], "gW": gpu["gW"], "gClk": gpu["gClk"], "gMemClk": gpu["gMemClk"],
+        "gClkMax": gpu["gClkMax"], "gU": gpu["gU"], "gMU": gpu["gMU"],
+        "vram": gpu["vram"], "vramTot": gpu["vramTot"], "gLim": gpu["gLim"],
+        "gLimDef": gpu.get("gLimDef"), "pstate": gpu["pstate"], "thr": gpu["thr"],
+        "fan": gpu["fan"], "thrIdle": gpu["thrIdle"], "thrPower": gpu["thrPower"],
+        "thrThermal": gpu["thrThermal"], "thrHw": gpu["thrHw"],
+        "pcieGen": gpu["pcieGen"], "pcieWidth": gpu["pcieWidth"], "pcieMax": gpu["pcieMax"],
+        "vbw": gpu["vbw"], "prx": gpu["prx"], "ptx": gpu["ptx"], "pcu": gpu["pcu"],
+        "gbw": gpu["gbw"], "gpeak": gpu["gpeak"], "pctheory": gpu["pctheory"],
+        "ramU": ram_used, "cache": None, "avail": mem_avail, "memTot": mem_total,
+        "swapU": swap_used, "swapTot": swap_total, "majF": None, "minF": None,
+        "swp": None, "ramBW": None, "drives": [drive_view(drive) for drive in drives],
+        "snap": snap,
+    }
+    for idx, drive in enumerate(drives):
+        data[f"r{idx}"] = drive.get("r")
+        data[f"w{idx}"] = drive.get("w")
+        data[f"i{idx}"] = drive.get("ops")
+        data[f"a{idx}"] = drive.get("a")
+        data[f"a{idx}Idle"] = drive.get("idle")
+        data[f"u{idx}"] = drive.get("u")
+        data[f"q{idx}"] = drive.get("q")
+        data[f"t{idx}"] = drive.get("temp")
+    sync_health(data)
+    return data
+
 def build_snapshot():
     global _last_t
     now = time.monotonic()
     dt = None if _last_t is None else now - _last_t
     _last_t = now
+
+    if platform.system() == "Windows":
+        return build_windows_snapshot(dt)
 
     busy, total_busy, total_all, ctxt = proc_stat()
     cur_f, max_f = cpufreq()
@@ -992,14 +1356,20 @@ def snapshot():
 @app.get("/api/health")
 def health():
     """Availability of every metric key: null reason = available, string = why unavailable."""
-    return JSONResponse({"ok": True, "nvml": NVML, "items": dict(_health)})
+    return JSONResponse({"ok": True, "platform": platform.system(), "nvml": NVML,
+                         "items": dict(_health)})
 
 # ---- recording (persistensi log di repo) -------------------------------------
 
 LOGS = Path(os.environ.get("AETHER_LOG_DIR", BASE.parent / "logs")).resolve()
 LOG_COLS = [("cpuT", "cpu_temp_c"), ("cpuW", "cpu_power_w"), ("gT", "gpu_temp_c"),
             ("gW", "gpu_power_w"), ("vbw", "vram_bw_gbs"), ("prx", "pcie_rx_gbs"),
-            ("majF", "mem_major_faults_s"), ("r0", "drive0_read_mbps")]
+            ("majF", "mem_major_faults_s"), ("r0", "drive0_read_mbps"),
+            ("cpuU", "cpu_util_percent"), ("ramU", "ram_used_gib"),
+            ("memTot", "memory_total_gib"), ("avail", "memory_available_gib"),
+            ("swapU", "swap_used_gib"), ("pfa", "cpu_avg_clock_ghz"),
+            ("gU", "gpu_util_percent"), ("ctx", "context_switches_s"),
+            ("w0", "drive0_write_mbps"), ("i0", "drive0_iops")]
 _sessions = {}   # id -> sesi aktif
 
 def slug(s):
@@ -1008,13 +1378,18 @@ def slug(s):
 
 def _meta(sid):
     s = _sessions[sid]
-    return {"schema_version": 1, "id": sid, "label": s["label"], "tag": s["tag"],
+    config = s["config"]
+    return {"schema_version": 2, "id": sid, "label": s["label"], "tag": s["tag"],
             "interval_s": s["iv"],
             "start_ms": s["start"],
             "started_iso": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(s["start"] / 1000)),
             "status": s["status"], "samples": s["samples"], "markers": s["markers"],
             "csv": "samples.csv", "columns": ["timestamp_ms"] + [c for _, c in LOG_COLS],
-            "config": s["config"]}
+            "system": {key: config.get(key) for key in
+                       ("platform", "osName", "osVersion", "hostname", "manufacturer",
+                        "deviceModel", "cpuModel", "cpuLogical", "cpuPhysical",
+                        "memoryTotalGiB", "gpuName", "gpuDriver")},
+            "config": config}
 
 def _write_meta(sid):
     with open(_sessions[sid]["dir"] / "meta.json", "w") as f:
@@ -1152,7 +1527,40 @@ SCHEMA = BASE / "metrics_meta.json"
 @app.get("/api/schema")
 def api_schema():
     """Metadata metrik (label, satuan, digits, sumber, scaleKey) untuk UI."""
-    return JSONResponse(json.loads(SCHEMA.read_text()))
+    schema = json.loads(SCHEMA.read_text())
+    if platform.system() == "Windows":
+        windows_sources = {
+            "cpuU": ("Util", "psutil.cpu_percent per logical processor"),
+            "pfa": ("CPU clock", "psutil.cpu_freq"),
+            "pu": ("Logical CPU util", "psutil.cpu_percent"),
+            "pf": ("Logical CPU clock", "psutil.cpu_freq"),
+            "pt": ("CPU temperature", "tidak tersedia melalui psutil pada Windows"),
+            "eu": ("E-core util", "Windows collector tidak mengklasifikasikan P/E cores"),
+            "ef": ("E-core clock", "Windows collector tidak mengklasifikasikan P/E cores"),
+            "et": ("E-core temp", "Windows collector tidak mengklasifikasikan P/E cores"),
+            "cpuT": ("CPU temp", "tidak tersedia melalui psutil pada Windows"),
+            "cpuW": ("Power", "tidak tersedia melalui psutil pada Windows"),
+            "ctx": ("Context switches", "psutil.cpu_stats"),
+            "irq": ("Interrupts", "psutil.cpu_stats"),
+            "cache": ("Page cache", "tidak tersedia melalui psutil pada Windows"),
+            "cpuThr": ("Throttle", "tidak tersedia melalui psutil pada Windows"),
+            "idle": ("Idle residency", "tidak tersedia melalui psutil pada Windows"),
+            "migr": ("Migrations", "tidak tersedia melalui psutil pada Windows"),
+            "ramBW": ("Measured bandwidth", "tidak tersedia melalui Windows collector"),
+            "ramU": ("RAM used", "psutil.virtual_memory"),
+            "memTot": ("Total", "psutil.virtual_memory"),
+            "avail": ("Available", "psutil.virtual_memory"),
+            "swapU": ("Swap used", "psutil.swap_memory"),
+            "swapTot": ("Swap total", "psutil.swap_memory"),
+            "r0": ("Disk read", "psutil.disk_io_counters"),
+            "w0": ("Disk write", "psutil.disk_io_counters"),
+            "i0": ("Disk IOPS", "psutil.disk_io_counters"),
+        }
+        for key, (label, source) in windows_sources.items():
+            if key in schema:
+                schema[key]["label"] = label
+                schema[key]["source"] = source
+    return JSONResponse(schema)
 
 @app.get("/api/themes")
 def api_themes():

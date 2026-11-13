@@ -6,7 +6,7 @@ const path = require("path");
 
 const PORT = 5130;
 const URL = `http://127.0.0.1:${PORT}/`;
-const APP_URL = process.platform === "win32" ? `${URL}?mock=1` : URL;
+const APP_URL = process.env.NOTERRA_DEMO_MODE === "1" ? `${URL}?mock=1` : URL;
 
 let backend = null;
 let mainWindow = null;

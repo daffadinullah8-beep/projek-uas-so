@@ -81,7 +81,7 @@
   const B = {
     hd: b => {
       const g = gauge(b.g), 
-            el = mk(`<div class="hd"><div class="gw"></div><div class="stats">${b.stats.map(s => `<div data-metric="${metricKey(s[1])}"><span>${s[1]}</span><b></b></div>`).join("")}</div></div>`);
+            el = mk(`<div class="hd"><div class="gw"></div><div class="stats">${b.stats.map(() => `<div><span></span><b></b></div>`).join("")}</div></div>`);
       el.querySelector(".gw").append(g.el);
       const bs = [...el.querySelectorAll("b")];
       return {
@@ -89,10 +89,14 @@
         up: () => {
           g.up();
           b.stats.forEach((s, i) => {
-            const sk = typeof s[0] === "function" ? s[0]() : s[0];
+            const sk = typeof s[0] === "function" ? s[0](C.data) : s[0];
+            const label = typeof s[1] === "function" ? s[1](C.data) : s[1];
+            const unit = typeof s[2] === "function" ? s[2](C.data) : s[2];
             const v = s[4] ? s[4](C.data) : C.data[sk];
+            bs[i].previousElementSibling.textContent = label;
+            bs[i].parentElement.dataset.metric = metricKey(label);
             if (typeof v === "number") {
-              bs[i].innerHTML = fx(v, s[3] || 0) + `<small>${s[2] || ""}</small>`;
+              bs[i].innerHTML = fx(v, s[3] || 0) + `<small>${unit || ""}</small>`;
               bs[i].removeAttribute("title");
             } else {
               bs[i].innerHTML = `<span class="na">${v == null ? "unavailable" : v}</span>`;
@@ -111,6 +115,7 @@
           const s = (C && C.data) || {};
           let P = s.pu || (s.snap && s.snap.pu) || [];
           let E = s.eu || (s.snap && s.snap.eu) || [];
+          const logical = s.snap && s.snap.cpuCoreType === "logical";
 
           // Jika data realtime belum ada, hitung core dinamis dari C.registry (snapshot test)
           if (P.length === 0 && E.length === 0 && C && C.registry) {
@@ -135,15 +140,20 @@
           }
 
           // Fallback default (6 P-core + 4 E-core = 10 core)
-          if (P.length === 0 && E.length === 0) {
+          if (P.length === 0 && E.length === 0 && !logical) {
             P = Array(6).fill(0);
             E = Array(4).fill(0);
           }
 
-          if (el.dataset.n !== String(P.length + E.length)) {
-            const cell = (p, k) => `<div>${[...Array(k)].map((_, i) => `<div class="cc"><i></i><b>${p}${i}</b><u></u><s></s></div>`).join("")}</div>`;
-            el.innerHTML = cell("P", P.length) + cell("E", E.length) + `<div class="hint2">GHz dan °C per core dari snapshot. Fill = utilisasi. "—" = tidak ada sumber.</div>`;
-            el.dataset.n = String(P.length + E.length);
+          const layout = `${logical ? "logical" : "hybrid"}:${P.length}:${E.length}`;
+          if (el.dataset.n !== layout) {
+            const cell = labels => `<div>${labels.map(label => `<div class="cc"><i></i><b>${label}</b><u></u><s></s></div>`).join("")}</div>`;
+            const groups = logical
+              ? [Array.from({ length: P.length }, (_, i) => `CPU${i}`)]
+              : [Array.from({ length: P.length }, (_, i) => `P${i}`),
+                Array.from({ length: E.length }, (_, i) => `E${i}`)];
+            el.innerHTML = groups.map(cell).join("") + `<div class="hint2">Clock dan suhu dari sensor yang tersedia. Fill = utilisasi. "—" = tidak ada sumber.</div>`;
+            el.dataset.n = layout;
           }
 
           const cc = [...el.querySelectorAll(".cc")];
@@ -343,7 +353,9 @@
   const PANELS = [
     {
       title: "CPU",
-      sub: s => (s.snap.cpuModel || "CPU") + ", " + ((S.pu || []).length) + " P + " + ((S.eu || []).length) + " E cores (dinamis dari kernel)",
+      sub: s => s.snap.cpuCoreType === "logical"
+        ? `${s.snap.cpuModel || "CPU"}, ${s.snap.cpuLogical || (S.pu || []).length} logical CPUs`
+        : (s.snap.cpuModel || "CPU") + ", " + ((S.pu || []).length) + " P + " + ((S.eu || []).length) + " E cores (dinamis dari kernel)",
       l: [
         {
           t: "hd",
@@ -356,7 +368,13 @@
             label: "temp · ring = daya vs PL1",
             in: { key: "cpuW", max: () => pl1(C.data) || dynMax("cpuW"), warn: s => near(s.cpuW, pl1(s), .9), bad: s => near(s.cpuW, pl1(s), 1) }
           },
-          stats: [["cpuU", "Util", "%"], ["migr", "Migrations", "/s"], ["pfa", "P clock", "GHz", 2], ["efa", "E clock", "GHz", 2, s => { const a = (S.ef || []).filter(x => typeof x === "number"); return a.length ? avg(a) : null; }]]
+          stats: [["cpuU", "Util", "%"], ["migr", "Migrations", "/s"],
+            ["pfa", s => s.snap.cpuCoreType === "logical" ? "Avg CPU clock" : "P clock", "GHz", 2],
+            ["efa", s => s.snap.cpuCoreType === "logical" ? "Logical CPUs" : "E clock",
+              s => s.snap.cpuCoreType === "logical" ? "" : "GHz", 2,
+              s => s.snap.cpuCoreType === "logical" ? s.snap.cpuLogical :
+                ((S.ef || []).filter(x => typeof x === "number").length
+                  ? avg((S.ef || []).filter(x => typeof x === "number")) : null)]]
         },
         { t: "cores" },
         {
@@ -491,7 +509,8 @@
     },
     {
       title: "Storage",
-      sub: s => C.drives.length ? C.drives.map(d => `${d.dev || "drive"}: ${d.name || "unavailable"}`).join(" · ") : "tidak ada drive di /sys/block",
+      sub: s => C.drives.length ? C.drives.map(d => `${d.dev || "drive"}: ${d.name || "unavailable"}`).join(" · ")
+        : s.snap.platform === "Windows" ? "tidak ada physical drive yang terdeteksi" : "tidak ada drive di /sys/block",
       l: [
         {
           t: "hd",
@@ -729,7 +748,7 @@
             "hud": "Live HUD Overlay"
           },
           "vs": {
-            "title": "Hardware Benchmark",
+            "title": "Contoh Statis — Hardware Benchmark (bukan hasil pengukuran)",
             "items": [
               {
                 "name": "RTX 4060",
@@ -744,7 +763,7 @@
             ]
           },
           "os": {
-            "title": "Benchmark Game: Bazzite OS vs SteamOS",
+            "title": "Contoh Statis — Benchmark Game (bukan hasil pengukuran)",
             "labels": [
               "OS 1",
               "OS 2"
@@ -971,11 +990,16 @@
     cpu: {
       demo: {"sub": "Ryzen 7 7800X3D", "big": 76, "rows": [["Core utama", "84%", 84], ["Core lain", "68%", 68], ["Temperature", "56°", 56]]},
       title: "CPU", icon: "cpu",
-      sub: s => s.snap.cpuModel || "CPU",
+      sub: s => s.snap.cpuCoreType === "logical"
+        ? `${s.snap.cpuModel || "CPU"} · ${s.snap.cpuLogical || (s.pu || []).length} logical CPUs`
+        : s.snap.cpuModel || "CPU",
       big: s => s.cpuU,
       rows: [
-        { l: "Core utama", f: s => [avgOf(s.pu), 100], t: s => withUnit(avgOf(s.pu), 0, "%") },
-        { l: "Core lain", f: s => [avgOf(s.eu), 100], t: s => withUnit(avgOf(s.eu), 0, "%") },
+        { l: s => s.snap.cpuCoreType === "logical" ? "Logical CPU avg" : "Core utama",
+          f: s => [avgOf(s.pu), 100], t: s => withUnit(avgOf(s.pu), 0, "%") },
+        { l: s => s.snap.cpuCoreType === "logical" ? "Average CPU clock" : "Core lain",
+          f: s => s.snap.cpuCoreType === "logical" ? [s.pfa, s.pfaMax] : [avgOf(s.eu), 100],
+          t: s => s.snap.cpuCoreType === "logical" ? withUnit(s.pfa, 2, " GHz") : withUnit(avgOf(s.eu), 0, "%") },
         { l: "Temperature", f: s => [s.cpuT, 100], t: s => withUnit(s.cpuT, 0, "°"), warn: s => cpuThrottling(s) }
       ]
     },
@@ -1007,7 +1031,7 @@
     },
     nvme: {
       demo: {"sub": "WD Black SN850X", "big": 34, "rows": [["Baca", "34 MB/s", 34], ["Tulis", "2 MB/s", 8], ["Kesehatan", "Baik", 100]]},
-      title: "NVMe", icon: "clock", alt: true, dark: true,
+      title: "Storage", icon: "clock", alt: true, dark: true,
       sub: s => drv0().name || "Storage",
       big: s => isNum(drv0().capUsed) ? drv0().capUsed : s.u0,
       rows: [

@@ -61,7 +61,7 @@ function drawDrives(ctx){
       <div class="drive-row"><span>Temp</span><b class="d-temp">—</b><small>°C</small></div>
       <div class="drive-row"><span>Used</span><b class="d-cap">—</b><small>%</small></div>
       <div class="cap"><i class="d-capbar"></i></div>
-    </div>`).join(""):'<div class="empty-inline">tidak ada drive di /sys/block</div>';
+    </div>`).join(""):'<div class="empty-inline">tidak ada drive yang terdeteksi</div>';
   }
   ds.forEach((d,i)=>{
     const c=box.querySelector(`[data-i="${i}"]`); if(!c)return;
@@ -104,7 +104,7 @@ function mount(root,ctx){
           <div class="stats">
             <div><span>Util</span><b id="nui-cpu-util">—</b><small>%</small></div>
             <div><span>Power</span><b id="nui-cpu-w">—</b><small>W</small></div>
-            <div><span>P clock</span><b id="nui-cpu-clk">—</b><small>GHz</small></div>
+            <div><span id="nui-cpu-clk-label">P clock</span><b id="nui-cpu-clk">—</b><small>GHz</small></div>
             <div><span>Major flt</span><b id="nui-cpu-flt">—</b><small>/s</small></div>
           </div>
         </div>
@@ -179,7 +179,11 @@ function update(ctx){
   const clock=q("#nui-clock"); if(clock)clock.textContent=new Date().toLocaleTimeString();
 
   const cpuSub=q("#nui-cpu-sub");
-  if(cpuSub)cpuSub.textContent=(snap.cpuModel||"CPU")+` · ${(s.pu||[]).length} P + ${(s.eu||[]).length} E`;
+  if(cpuSub)cpuSub.textContent=snap.cpuCoreType==="logical"
+    ?`${snap.cpuModel||"CPU"} · ${snap.cpuLogical||(s.pu||[]).length} logical CPUs`
+    :(snap.cpuModel||"CPU")+` · ${(s.pu||[]).length} P + ${(s.eu||[]).length} E`;
+  const cpuClockLabel=q("#nui-cpu-clk-label");
+  if(cpuClockLabel)cpuClockLabel.textContent=snap.cpuCoreType==="logical"?"Avg CPU clock":"P clock";
   setRing(q("#nui-cpu-ring"),q("#nui-cpu-temp"),ctx,"cpuT",100,0);
   setNum(q("#nui-cpu-util"),ctx,"cpuU",0);
   setNum(q("#nui-cpu-w"),ctx,"cpuW",1);
@@ -218,7 +222,7 @@ function update(ctx){
     if(isNum(s.ramU)&&isNum(s.memTot)){memBig.textContent=`${s.ramU.toFixed(1)} / ${s.memTot.toFixed(1)} GiB`;memBig.classList.remove("na");memBig.removeAttribute("title")}
     else{memBig.textContent="unavailable";memBig.classList.add("na");memBig.title=reason(ctx,"ramU")}
   }
-  const msub=q("#nui-mem-sub"); if(msub)msub.textContent=snap.kernel?("kernel "+snap.kernel):"kernel unavailable";
+  const msub=q("#nui-mem-sub"); if(msub)msub.textContent=snap.osName|| (snap.kernel?("kernel "+snap.kernel):"OS unavailable");
   setNum(q("#nui-cache"),ctx,"cache",1);
   setNum(q("#nui-avail"),ctx,"avail",1);
   setNum(q("#nui-swap"),ctx,"swapU",1);
@@ -227,9 +231,9 @@ function update(ctx){
   drawTrace(ctx);
   drawDrives(ctx);
 
-  const dsub=q("#nui-drive-sub"); if(dsub)dsub.textContent=drives.length+" drive · /sys/block";
+  const dsub=q("#nui-drive-sub"); if(dsub)dsub.textContent=drives.length+" drive · "+(snap.platform==="Windows"?"Windows counters":"sysfs");
   const fl=q("#nui-foot-l"), fr=q("#nui-foot-r");
-  if(fl)fl.textContent=(snap.cpuModel||"CPU")+" · "+(snap.kernel||"kernel unavailable");
+  if(fl)fl.textContent=(snap.cpuModel||"CPU")+" · "+(snap.osName||snap.kernel||"OS unavailable");
   if(fr)fr.textContent="governor "+(snap.governor||"unavailable")+" · EPP "+(snap.epp||"unavailable")+" · pinning "+(snap.pinning||"unavailable");
 }
 

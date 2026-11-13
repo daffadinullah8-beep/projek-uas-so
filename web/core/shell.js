@@ -214,10 +214,14 @@ function show(id){
 }
 
 /* ---- tab Log: sesi persisten di server, folder logs/<tanggal>_<label>/ ---- */
-const METRICS=[["cpuT","CPU temp","°C","cpu_temp_c"],["cpuW","CPU power","W","cpu_power_w"],["gT","GPU temp","°C","gpu_temp_c"],["gW","GPU power","W","gpu_power_w"],["vbw","VRAM bandwidth","GB/s","vram_bw_gbs"],["prx","PCIe receive","GB/s","pcie_rx_gbs"],["majF","Major faults","/s","mem_major_faults_s"],["r0","NVMe 0 read","MB/s","nvme0_read_mbps"]];
+const METRICS=[["cpuT","CPU temp","°C","cpu_temp_c"],["cpuW","CPU power","W","cpu_power_w"],["cpuU","CPU utilization","%","cpu_util_percent"],["pfa","CPU average clock","GHz","cpu_avg_clock_ghz"],["gT","GPU temp","°C","gpu_temp_c"],["gW","GPU power","W","gpu_power_w"],["gU","GPU utilization","%","gpu_util_percent"],["vbw","VRAM bandwidth","GB/s","vram_bw_gbs"],["prx","PCIe receive","GB/s","pcie_rx_gbs"],["majF","Major faults","/s","mem_major_faults_s"],["ramU","RAM used","GiB","ram_used_gib"],["memTot","RAM total","GiB","memory_total_gib"],["avail","RAM available","GiB","memory_available_gib"],["swapU","Swap used","GiB","swap_used_gib"],["ctx","Context switches","/s","context_switches_s"],["r0","Disk 0 read","MB/s","drive0_read_mbps"],["w0","Disk 0 write","MB/s","drive0_write_mbps"],["i0","Disk 0 IOPS","IOPS","drive0_iops"]];
 /* header CSV -> key registry; fallback: nama kolom yang kebetulan sama dengan key */
 const HEADER_TO_KEY={"cpu_temp_c":"cpuT","cpu_power_w":"cpuW","gpu_temp_c":"gT","gpu_power_w":"gW",
-  "vram_bw_gbs":"vbw","pcie_rx_gbs":"prx","mem_major_faults_s":"majF","nvme0_read_mbps":"r0"};
+  "cpu_util_percent":"cpuU","cpu_avg_clock_ghz":"pfa","gpu_util_percent":"gU",
+  "vram_bw_gbs":"vbw","pcie_rx_gbs":"prx","mem_major_faults_s":"majF",
+  "ram_used_gib":"ramU","memory_total_gib":"memTot","memory_available_gib":"avail",
+  "swap_used_gib":"swapU","context_switches_s":"ctx","nvme0_read_mbps":"r0",
+  "drive0_read_mbps":"r0","drive0_write_mbps":"w0","drive0_iops":"i0"};
 let LOG_METRICS=METRICS;          // [key,label,unit]; diperbarui dari header CSV
 const COL=["--a","--b","--ok","--warn","--bad"];
 let SES=[],sel=new Set(),CSV={},lo={m:"cpuT",trim:0,grp:true,iv:1,lb:"",tg:""};

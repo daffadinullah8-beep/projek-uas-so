@@ -7,8 +7,9 @@ tersedia ditampilkan sebagai `unavailable`, bukan diisi dengan angka perkiraan.
 
 ## Arsitektur
 
-- **Python FastAPI Telemetry Backend** — membaca metrik dari Linux `/proc`,
-  `/sys`, dan NVML; menyediakan snapshot, status ketersediaan metrik, serta
+- **Python FastAPI Telemetry Backend** — mengumpulkan telemetry melalui sumber
+  OS: Linux `/proc`, `/sys`, dan NVML; Windows psutil, Windows CIM, dan NVML.
+  Backend menyediakan snapshot, alasan metrik yang tidak tersedia, serta
   perekaman sesi ke CSV/JSON.
 - **Web UI Modular Dashboard** — frontend vanilla JavaScript dengan core data
   client, shell navigasi, renderer widget/layout, dan tiga view: Dashboard,
@@ -25,8 +26,9 @@ resolusi tetap `unavailable` sampai integrasi VKD3D/DX12 disediakan.
 
 - Node.js dan npm untuk aplikasi desktop serta smoke test UI.
 - Python 3 untuk menjalankan backend dalam mode pengembangan.
-- Linux direkomendasikan untuk telemetry hardware aktual karena collector
-  membaca `/proc` dan `/sys`. Electron di Windows berjalan dalam mode demo.
+- Build Electron menyediakan collector untuk Windows dan Linux. Ketersediaan
+  suhu/daya CPU serta sensor tertentu tetap bergantung pada OS, driver, hardware,
+  dan izin; metrik yang tidak didukung ditandai `unavailable`.
 
 ### Instalasi
 
@@ -87,6 +89,12 @@ Status pengujian UI: **Smoke Test UI: 100% ALL PASS (Default, Minimal, Neon Them
 Test memakai jsdom dan fixture/mock; test ini tidak menjalankan backend pada
 hardware nyata.
 
+Uji collector Windows dengan:
+
+```bash
+py -3 -m unittest discover -s tests -p "test_windows_backend.py"
+```
+
 ### Aplikasi desktop Electron
 
 Setelah instalasi dependensi root selesai, jalankan dari root proyek:
@@ -98,12 +106,27 @@ npm start
 Launcher menjalankan backend sebagai child process dan menutupnya saat jendela
 ditutup. Build distribusi membundel backend FastAPI sebagai executable mandiri,
 jadi pengguna aplikasi hasil build tidak perlu memasang Python. Di Windows,
-dashboard dibuka dalam mode fixture (`?mock=1`) karena collector telemetry
-memakai sumber Linux (`/proc` dan `/sys`); di Linux, dashboard memakai telemetry
-live. Untuk membuat paket distribusi, siapkan Python 3.11 dan dependensi
-`server/requirements.txt` beserta PyInstaller pada mesin build, lalu jalankan
-`npm run build:win` atau `npm run build:linux`. Build backend harus dilakukan
-pada OS targetnya masing-masing.
+dashboard dan Linux sama-sama menggunakan telemetry live. Windows mengambil
+metrik umum melalui psutil; suhu/daya CPU dan beberapa sensor khusus tetap
+`unavailable` jika tidak tersedia dari Windows/driver. Demo bisa diaktifkan
+secara eksplisit dengan `NOTERRA_DEMO_MODE=1`. Untuk membuat paket distribusi,
+siapkan Python 3.11 dan dependensi `server/requirements.txt` beserta PyInstaller
+pada mesin build, lalu jalankan `npm run build:win` atau `npm run build:linux`.
+Build backend harus dilakukan pada OS targetnya masing-masing.
+
+### Membandingkan sesi Windows dan Linux
+
+Rekam sesi di tiap perangkat dengan nama workload yang sama dan tag platform
+yang jelas (misalnya `Windows` dan `Bazzite`); samakan versi game, pengaturan
+grafis, durasi, serta prosedur warm-up. Setelah sesi
+berhenti, setiap folder sesi berisi `samples.csv` dan `meta.json` (identitas
+perangkat, OS, CPU/GPU, dan driver). Salin folder sesi dari kedua perangkat ke
+folder `logs` di direktori data pengguna Aether OS pada satu perangkat, lalu
+buka ulang aplikasi. Pilih sesi-sesi tersebut di Session Manager untuk
+membandingkan dan mengekspor data. Gunakan metrik yang tersedia pada kedua OS;
+nilai `unavailable` bukan nol. Karena perangkatnya berbeda, hasil juga
+mencerminkan perbedaan hardware, bukan hanya pengaruh OS. Kartu benchmark pada
+Dashboard adalah contoh statis dan bukan hasil pengukuran aktual.
 
 ## Struktur Proyek
 
