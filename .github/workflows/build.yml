@@ -5,6 +5,13 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: aether-os-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -60,3 +67,40 @@ jobs:
             dist/*.exe
             dist/*.AppImage
             dist/*.deb
+
+  release:
+    name: Publish latest GitHub Release
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Aether-OS-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Move latest tag to this build
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: git push --force origin "${COMMIT_SHA}:refs/tags/latest"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          target_commitish: ${{ github.sha }}
+          name: Latest build from main
+          body: Automatically updated build from the main branch.
+          make_latest: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*.AppImage
+            release-assets/*.deb
+            release-assets/*.exe
