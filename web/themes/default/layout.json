@@ -19,6 +19,7 @@
           "hud": "Live HUD Overlay"
         },
         "vs": {
+          "sample": true,
           "title": "Performa Gaming Handheld (FPS & Suhu)",
           "items": [
             {
@@ -27,35 +28,31 @@
               "temp": 67
             },
             {
-              "name": "SteamOS",
+              "name": "Windows",
               "fps": 158,
               "temp": 71
             }
           ]
         },
         "os": {
-          "title": "Benchmark Game: Bazzite OS vs SteamOS",
+          "sample": true,
+          "title": "Benchmark Game: Bazzite OS vs Windows",
           "labels": [
             "Bazzite OS",
-            "SteamOS"
+            "Windows"
           ],
           "max": 200,
           "axis": true,
           "rows": [
             {
-              "name": "Cyberpunk 2077",
-              "a": 164,
-              "b": 158
-            },
-            {
-              "name": "Hogwarts Legacy",
+              "name": "Wuthering Waves",
               "a": 88,
               "b": 94
             },
             {
-              "name": "GTA V / DOTA 2",
-              "a": 142,
-              "b": 138
+              "name": "Cyberpunk 2077",
+              "a": 164,
+              "b": 158
             }
           ]
         }

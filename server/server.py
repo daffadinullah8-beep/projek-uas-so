@@ -1001,6 +1001,13 @@ def windows_drive_metrics(dt):
     rows = []
     info, info_warning = windows_system_info()
     models = {}
+    system_volume = None
+    capacity_warning = None
+    if platform.system() == "Windows":
+        try:
+            system_volume = psutil.disk_usage("C:\\")
+        except (psutil.Error, OSError, RuntimeError) as error:
+            capacity_warning = f"Penggunaan volume Windows C:\\ gagal dibaca: {error}"
     for disk in info.get("disks") or []:
         device_id = str(disk.get("DeviceID") or "").upper().replace("\\\\.\\", "")
         models[device_id] = disk
@@ -1053,6 +1060,10 @@ def windows_drive_metrics(dt):
             "capUsed": None,
             "mount": None,
         }
+        if idx == 0 and system_volume is not None:
+            out["sizeGB"] = system_volume.total / 1e9
+            out["capUsed"] = system_volume.percent
+            out["mount"] = "C:\\"
         for metric, key in keys.items():
             if out[metric] is not None:
                 avail(key)
@@ -1071,6 +1082,8 @@ def windows_drive_metrics(dt):
                                ("link", "link"), ("linkMax", "linkMax")):
             if out[metric] is None:
                 reason = info_warning or f"Windows CIM tidak menyediakan metadata disk {dev}"
+                if metric == "capUsed" and idx == 0 and capacity_warning:
+                    reason = capacity_warning
                 if metric in ("sched", "readahead", "link", "linkMax"):
                     reason = f"{metric} per physical drive tidak tersedia dari Windows"
                 avail(f"d{idx}{suffix}", reason)

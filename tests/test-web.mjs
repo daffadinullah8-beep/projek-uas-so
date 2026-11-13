@@ -113,7 +113,20 @@ ok(d.querySelector(".card.hero .name")?.textContent.includes("RTX 4060"), "hero:
 ok(/%$/.test(d.querySelector(".dash > .card .big b")?.textContent || ""), "kartu CPU: angka besar berisi persen");
 ok([...d.querySelectorAll(".dash .card")].every(c => !c.textContent.includes("undefined")), "kartu tanpa 'undefined'");
 ok(d.querySelectorAll(".card.vs .item").length === 2, "Hardware Benchmark: 2 item");
-ok(d.querySelectorAll(".card.cmp .crow").length === 3, "Benchmark Game: 3 baris");
+ok(d.querySelector(".card.vs h2")?.textContent === "Performa Gaming Handheld (FPS & Suhu)",
+  "kartu ringkasan memakai judul performa gaming");
+ok(d.querySelectorAll(".card.cmp .crow").length === 2
+  && d.querySelector(".card.cmp h2")?.textContent === "Benchmark Game: Bazzite OS vs Windows"
+  && [...d.querySelectorAll(".card.cmp .crow > span")].map(x => x.textContent).join(",")
+    === "Wuthering Waves,Cyberpunk 2077",
+  "Benchmark Game menampilkan dua judul yang diminta");
+ok([...d.querySelectorAll(".card.cmp .legend span")].map(x => x.textContent).join(",")
+  === "Bazzite OS,Windows",
+  "Benchmark Game membandingkan Bazzite OS dan Windows");
+ok([...d.querySelectorAll(".card.vs .item > span")].map(x => x.textContent).join(",")
+  === "Bazzite OS,Windows"
+  && d.querySelectorAll(".card.vs .sample-note, .card.cmp .sample-note").length === 2,
+  "kartu ringkasan memakai Windows dan menandai kedua set angka sebagai contoh statis");
 ok(d.querySelector(".card.alt .subt")?.textContent.length > 0, "kartu NVMe: subjudul terisi");
 ok(d.querySelectorAll("#nav .themesw button").length === 3, "saklar Light/Dark/Neon terpasang");
 ok(["display: flex", "align-items: center", "justify-content: space-between",
@@ -142,22 +155,22 @@ ok(DEFAULT_CSS.includes(".layout-host > .layout > .w:has(> .p) {")
 ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b2 { background: var(--gray-bar); color: #fff;')
   && DEFAULT_CSS.includes('[data-theme="light"] .cmp .legend i.o { background: var(--gray-bar);')
   && DEFAULT_CSS.includes('--gray-bar: #8e8e93;'),
-  "bar dan legenda SteamOS memakai abu-abu yang sama dengan tema light");
+  "bar dan legenda Windows memakai abu-abu yang sama dengan tema light");
 ok(DEFAULT_CSS.includes('.cmp .b1 { background: var(--a); color: var(--on-dark); }')
   && DEFAULT_CSS.includes('.cmp .b2 { background: #fff; color: #000; }')
   && DEFAULT_CSS.includes('.cmp .legend i { background: var(--a); }')
   && DEFAULT_CSS.includes('.cmp .legend i.o { background: var(--gray-bar); }'),
-  "bar Bazzite kuning dan bar SteamOS putih pada tema dark");
+  "bar Bazzite kuning dan bar Windows putih pada tema dark");
 ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b1 { background: var(--a); color: #000; }')
   && DEFAULT_CSS.includes('[data-theme="light"] .cmp .legend i { background: var(--a); }'),
   "bar dan simbol Bazzite kuning, angka bar hitam pada tema light");
 ok(DEFAULT_CSS.includes('[data-theme="light"] .cmp .b2 { background: var(--gray-bar); color: #fff; }'),
-  "bar SteamOS tetap abu-abu pada tema light");
+  "bar Windows tetap abu-abu pada tema light");
 ok(DEFAULT_CSS.includes('.vs .pbar i.g { background: #fff; color: #000; }')
   && DEFAULT_CSS.includes('[data-theme="light"] .vs .pbar i.g { background: var(--gray-bar); color: #fff; }')
   && !DEFAULT_CSS.includes('[data-theme="dark"] .vs .pbar i.g { color: #fff; }')
   && DEFAULT_CSS.includes('[data-theme="dark"] .cmp .legend i.o { background: #fff; }'),
-  "bar SteamOS abu-abu di tema light, putih di tema dark, dengan angka hitam");
+  "bar Windows abu-abu di tema light, putih di tema dark, dengan angka hitam");
 ok(DEFAULT_THEME.version === "2.1"
   && d.querySelector("#ui-theme-stylesheet")?.getAttribute("href") === "themes/default/theme.css?v=2.1",
   "stylesheet tema default memakai URL versi baru untuk melewati cache");
@@ -332,6 +345,16 @@ ok(visible(".p-gpu header h2") && visible(".p-gpu .hd .gw")
     visible(`.p-gpu .stats [data-metric="${metric}"]`))
   && visible(".p-gpu .ch svg.sp"),
   "GPU: judul, ring gauge, metrik utama, dan grafik tampil");
+const gpuTempTab = dl.querySelector('.p-gpu .tabs button[data-metric="gpu-temp"]');
+const gpuTempValues = lay.window.Noterra.ctx.hist("gT");
+const gpuTempPath = dl.querySelector(".p-gpu .ch svg.sp path.l")?.getAttribute("d");
+const gpuTempFirstY = gpuTempPath && Number(gpuTempPath.match(/^M[\d.]+,([\d.]+)/)?.[1]);
+const gpuTempExpectedY = gpuTempValues.length
+  ? 48 - (Math.min(95, Math.max(30, gpuTempValues[0])) - 30) / 65 * 46
+  : NaN;
+ok(gpuTempTab?.textContent === "GPU temp" && gpuTempValues.length > 1
+  && Number.isFinite(gpuTempFirstY) && Math.abs(gpuTempFirstY - gpuTempExpectedY) < 0.1,
+  "grafik GPU temp memakai skala tetap 30-95°C");
 ok(!visible(".p-cpu .hint2")
   && ["governor", "epp", "turbo", "context-switches", "interrupts", "throttle"]
     .every(metric => !visible(`.p-cpu .pr [data-metric="${metric}"]`))
@@ -362,8 +385,13 @@ ok(["major-faults", "minor-faults", "swap-i-o", "measured-bandwidth", "hugepages
 ok(["queue", "scheduler", "readahead", "await", "iops", "util"]
   .every(metric => dl.querySelector(`.p-storage [data-metric="${metric}"]`))
   && dl.querySelector(".p-storage .ch svg.sp")
-  && dl.querySelector(".p-storage .bars [data-metric=capacity]"),
+  && dl.querySelector(".p-storage .bars [data-metric=capacity]")
+  && dl.querySelector(".p-storage .tb")?.style.gridTemplateColumns.startsWith("minmax(0, 1.2fr) repeat("),
   "Storage: detail sekunder tetap di DOM, grafik dan bar kapasitas tersedia");
+ok(DEFAULT_CSS.includes(".p-storage .tb > * { min-width: 0; }")
+  && DEFAULT_CSS.includes("overflow-wrap: anywhere;")
+  && DEFAULT_CSS.includes(".sample-note {"),
+  "kolom detail Storage dapat menyusut/membungkus teks dan catatan data contoh terbaca");
 ok(DEFAULT_CSS.includes(".p-cpu .pr [data-metric]") && DEFAULT_CSS.includes(".p-gpu .pr [data-metric]")
   && DEFAULT_CSS.includes(".p-memory .tabs [data-metric=\"page-faults\"]")
   && DEFAULT_CSS.includes(".p-storage .tb [data-metric=\"queue\"]")

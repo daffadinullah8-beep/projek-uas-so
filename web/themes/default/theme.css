@@ -734,3 +734,7 @@ nav button[aria-current=true], nav button[aria-pressed=true] {
 .p-storage .tb [data-metric="scheduler"],
 .p-storage .tb [data-metric="readahead"],
 .p-storage .tb [data-metric="await"] { display: none; }
+.p-storage .tb { width: 100%; min-width: 0; }
+.p-storage .tb > * { min-width: 0; }
+.p-storage .tb dt.h { overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; }
+.sample-note { margin: 0 0 8px; color: var(--mute); font-size: 11px; }

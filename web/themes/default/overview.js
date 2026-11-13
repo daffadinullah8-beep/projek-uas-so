@@ -16,7 +16,7 @@
   const dynMax = k => C.max(k);
   const metricKey = label => String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  function spark(svg, keys, cols, min) {
+  function spark(svg, keys, cols, min, max) {
     const pairs = keys.map((k, i) => [H(k) || [], cols[i]]).filter(([d]) => d.length > 1);
     if (!pairs.length) {
       svg.innerHTML = "";
@@ -24,11 +24,12 @@
     }
     const all = pairs.flatMap(([d]) => d),
           mn = min ?? Math.min(...all),
-          span = (Math.max(...all) - mn) || 1,
+          mx = max ?? Math.max(...all),
+          span = (mx - mn) || 1,
           h = svg.viewBox.baseVal.height;
           
     svg.innerHTML = pairs.map(([d, c]) => 
-      `<path class="l" style="stroke:var(${c})" d="${d.map((v, j) => `${j ? "L" : "M"}${(j / Math.max(d.length - 1, 1) * 200).toFixed(1)},${(h - 2 - (v - mn) / span * (h - 4)).toFixed(1)}`).join("")}"/>`
+      `<path class="l" style="stroke:var(${c})" d="${d.map((v, j) => `${j ? "L" : "M"}${(j / Math.max(d.length - 1, 1) * 200).toFixed(1)},${(h - 2 - (clamp(v, mn, mx) - mn) / span * (h - 4)).toFixed(1)}`).join("")}"/>`
     ).join("");
   }
 
@@ -210,7 +211,7 @@
       let ti = 0;
       const el = mk(`<div class="ch"><div class="tabs">${b.tabs.map(x => `<button data-metric="${metricKey(x.n)}">${x.n}</button>`).join("")}<em class="lg"></em></div><svg class="sp" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>`);
       const sv = el.querySelector("svg"), btn = [...el.querySelectorAll("button")], lg = el.querySelector(".lg");
-      const draw = () => spark(sv, b.tabs[ti].s.map(s => s[0]), b.tabs[ti].s.map(s => s[2]), b.tabs[ti].min);
+      const draw = () => spark(sv, b.tabs[ti].s.map(s => s[0]), b.tabs[ti].s.map(s => s[2]), b.tabs[ti].min, b.tabs[ti].max);
       const tab = i => {
         ti = i;
         btn.forEach((x, j) => x.setAttribute("aria-pressed", j === i));
@@ -277,6 +278,8 @@
           const cols = b.n(C.data);
           if (cols !== n) {
             n = cols;
+            box.style.gridTemplateColumns =
+              `minmax(0, 1.2fr) repeat(${Math.max(cols, 1)}, minmax(0, 1fr))`;
             box.innerHTML = `<dt></dt>` + Array.from({ length: cols }, (_, i) => `<dt class="h">${esc(b.hdr(C.data, i))}</dt>`).join("") +
               b.rows.map(r => `<dt data-metric="${metricKey(r[0])}">${r[0]}</dt>` + Array.from({ length: cols }, () => `<dd data-metric="${metricKey(r[0])}"></dd>`).join("")).join("");
             dd = [...box.querySelectorAll("dd")];
@@ -304,7 +307,7 @@
         if (!tabs.length) { lg.innerHTML = ""; return; }
         sync();
         ti = Math.min(ti, tabs.length - 1);
-        spark(sv, tabs[ti].s.map(x => x[0]), tabs[ti].s.map(x => x[2]), tabs[ti].min);
+        spark(sv, tabs[ti].s.map(x => x[0]), tabs[ti].s.map(x => x[2]), tabs[ti].min, tabs[ti].max);
         lg.innerHTML = tabs[ti].s.map(x => `<span><i style="background:var(${x[2]})"></i>${x[1]}</span>`).join("");
         const cur = tabs[ti].s[0] ? tabs[ti].s[0][0] : "";
         [...tb.querySelectorAll("button")].forEach(x => x.setAttribute("aria-pressed", String(x.dataset.key === cur)));
@@ -439,6 +442,7 @@
         {
           t: "chart",
           tabs: [
+            { n: "GPU temp", min: 30, max: 95, s: [["gT", "Temp (°C)", "--b"]] },
             { n: "Temp and power", s: [["gT", "Temp (°C)", "--b"], ["gW", "Power (W)", "--a"]] },
             { n: "Util", min: 0, s: [["gU", "GPU (%)", "--a"], ["gMU", "Mem ctrl (%)", "--b"]] },
             { n: "VRAM bw", min: 0, s: [["vbw", "GB/s (est.)", "--a"]] },
@@ -748,43 +752,40 @@
             "hud": "Live HUD Overlay"
           },
           "vs": {
-            "title": "Contoh Statis — Hardware Benchmark (bukan hasil pengukuran)",
+            "sample": true,
+            "title": "Performa Gaming Handheld (FPS & Suhu)",
             "items": [
               {
-                "name": "RTX 4060",
+                "name": "Bazzite OS",
                 "fps": 164,
                 "temp": 67
               },
               {
-                "name": "RTX 2060",
-                "fps": 101,
-                "temp": 74
+                "name": "Windows",
+                "fps": 158,
+                "temp": 71
               }
             ]
           },
           "os": {
-            "title": "Contoh Statis — Benchmark Game (bukan hasil pengukuran)",
+            "sample": true,
+            "title": "Benchmark Game: Bazzite OS vs Windows",
             "labels": [
-              "OS 1",
-              "OS 2"
+              "Bazzite OS",
+              "Windows"
             ],
             "max": 200,
             "axis": true,
             "rows": [
               {
-                "name": "Cyberpunk",
-                "a": 164,
-                "b": 158
-              },
-              {
-                "name": "Hogwarts",
+                "name": "Wuthering Waves",
                 "a": 88,
                 "b": 94
               },
               {
-                "name": "GTA VI",
-                "a": 72,
-                "b": 70
+                "name": "Cyberpunk 2077",
+                "a": 164,
+                "b": 158
               }
             ]
           }
@@ -1096,15 +1097,15 @@
       .map(i => ({ name: i.name, fps: i.fps != null ? i.fps : i.score, temp: i.temp }));
     const mx = Math.max(...items.map(i => i.fps)) || 1;
     return {
-      el: one(`<section class="card vs"><h2>${esc(p.title || "Hardware Benchmark")}</h2>${items.map((it, i) => `<div class="item"><span>${esc(it.name)}</span><div class="line"><div class="pbar" style="width:${(it.fps / mx * 80).toFixed(1)}%"><i class="${i ? "g" : ""}">${esc(String(it.fps))}</i></div><b>${esc(String(it.temp).replace(/°$/, ""))}°</b></div></div>`).join("")}</section>`)
+      el: one(`<section class="card vs"><h2>${esc(p.title || "Hardware Benchmark")}</h2>${p.sample ? '<p class="sample-note">Data contoh statis; bukan hasil pengukuran perangkat.</p>' : ""}${items.map((it, i) => `<div class="item"><span>${esc(it.name)}</span><div class="line"><div class="pbar" style="width:${(it.fps / mx * 80).toFixed(1)}%"><i class="${i ? "g" : ""}">${esc(String(it.fps))}</i></div><b>${esc(String(it.temp).replace(/°$/, ""))}°</b></div></div>`).join("")}</section>`)
     };
   }
 
-  /* ---- "Benchmark Game: Bazzite OS vs SteamOS" — data contoh; ganti lewat props di layout.json ---- */
+  /* ---- "Benchmark Game: Bazzite OS vs Windows" — data contoh; ganti lewat props di layout.json ---- */
   function osCard(p) {
     p = p || {};
-    const mx = p.max || 200, labels = p.labels || ["Bazzite OS", "SteamOS"];
-    const rows = (p.rows || p.games || [{ name: "Cyberpunk", a: 164, b: 158 }, { name: "Hogwarts", a: 88, b: 94 }, { name: "GTA VI", a: 72, b: 70 }])
+    const mx = p.max || 200, labels = p.labels || ["Bazzite OS", "Windows"];
+    const rows = (p.rows || p.games || [{ name: "Wuthering Waves", a: 88, b: 94 }, { name: "Cyberpunk 2077", a: 164, b: 158 }])
       .map(r => ({ name: r.name, a: r.a != null ? r.a : r.os1, b: r.b != null ? r.b : r.os2 }));
     const ticks = [0, 1, 2, 3, 4].map(i => Math.round(mx / 4 * i));
     const w = v => clamp(v / mx * 100, 0, 100).toFixed(2) + "%";
@@ -1114,7 +1115,8 @@
       return `<div class="delta ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${Math.abs(d)}%</div>`;
     };
     return {
-      el: one(`<section class="card cmp"><h2>${esc(p.title || "Benchmark Game: Bazzite OS vs SteamOS")}</h2>
+      el: one(`<section class="card cmp"><h2>${esc(p.title || "Benchmark Game: Bazzite OS vs Windows")}</h2>
+        ${p.sample ? '<p class="sample-note">Data contoh statis; bukan hasil pengukuran perangkat.</p>' : ""}
         ${p.axis ? `<div class="axis"><span></span><div>${ticks.map(t => `<span>${t}</span>`).join("")}</div><span></span></div>` : ""}
         ${rows.map(r => `<div class="crow"><span>${esc(r.name)}</span><div class="bars2"><div class="b1" style="width:${w(r.a)}">${esc(String(r.a))}</div><div class="b2" style="width:${w(r.b)}">${esc(String(r.b))}</div></div>${delta(r)}</div>`).join("")}
         <div class="legend"><span><i></i>${esc(labels[0])}</span><span><i class="o"></i>${esc(labels[1])}</span></div></section>`)

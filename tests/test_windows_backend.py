@@ -82,6 +82,9 @@ class WindowsSnapshotTests(unittest.TestCase):
             patch.object(backend.psutil, "swap_memory", return_value=SimpleNamespace(
                 total=2 * 1024**3, used=512 * 1024**2,
             )),
+            patch.object(backend.psutil, "disk_usage", return_value=SimpleNamespace(
+                total=500 * 1024**3, used=200 * 1024**3, percent=40.0,
+            )),
             patch.object(backend.psutil, "disk_io_counters", side_effect=lambda **_: next(disk_samples)),
         ):
             first = backend.build_windows_snapshot(None)
@@ -100,7 +103,9 @@ class WindowsSnapshotTests(unittest.TestCase):
         self.assertEqual(second["i0"], 2.0)
         self.assertEqual(second["a0"], 30.0)
         self.assertEqual(second["drives"][0]["name"], "Test SSD")
-        self.assertEqual(second["drives"][0]["sizeGB"], 1000.0)
+        self.assertAlmostEqual(second["drives"][0]["sizeGB"], 500 * 1024**3 / 1e9)
+        self.assertEqual(second["drives"][0]["capUsed"], 40.0)
+        self.assertEqual(second["drives"][0]["mount"], "C:\\")
         self.assertEqual(second["snap"]["platform"], "Windows")
         self.assertEqual(second["snap"]["cpuCoreType"], "logical")
         self.assertTrue(second["snap"]["gpuPresent"])
