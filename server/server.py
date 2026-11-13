@@ -832,11 +832,14 @@ def windows_system_info():
         "deviceModel = $sys.Model; gpuNames = $gpus; gpuDrivers = $gpuDrivers; "
         "disks = $disks } | ConvertTo-Json -Compress -Depth 4"
     )
+    ps_exe = shutil.which("powershell.exe") or "powershell.exe"
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if platform.system() == "Windows" else 0
     try:
         result = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+            [ps_exe, "-NoProfile", "-NonInteractive", "-Command",
              "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); " + command],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=8
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=8,
+            creationflags=creationflags
         )
         if result.returncode != 0:
             detail = (result.stderr or "perintah CIM gagal").strip()
@@ -1608,10 +1611,16 @@ def mock_schema():
 
 @app.get("/")
 def index():
-    return HTMLResponse((WEB / "index.html").read_text())
+    index_file = WEB / "index.html"
+    if index_file.is_file():
+        return HTMLResponse(index_file.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Aether OS</h1>")
 
 # aset static web/ (core + themes); semua rute /api dan / sudah terdaftar sebelum mount
-app.mount("/", StaticFiles(directory=str(WEB)), name="web")
+if WEB.is_dir():
+    app.mount("/", StaticFiles(directory=str(WEB)), name="web")
+elif hasattr(sys, "_MEIPASS") and (Path(sys._MEIPASS) / "web").is_dir():
+    app.mount("/", StaticFiles(directory=str(Path(sys._MEIPASS) / "web")), name="web")
 
 def run_check():
     """Self-diagnostic: probe every source twice (rates need a delta) and print results."""
@@ -1628,8 +1637,71 @@ def run_check():
     return 0
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
+
+    import os
     import sys
+
+    # Pastikan stdout/stderr aman jika dijalankan tanpa console / windowed di Windows
+    class SafeStream:
+        def __init__(self, stream, fallback_file=None):
+            self.stream = stream
+            self.fallback_file = fallback_file
+
+        def write(self, data):
+            if not data:
+                return
+            if self.stream:
+                try:
+                    self.stream.write(data)
+                    self.stream.flush()
+                except Exception:
+                    pass
+            if self.fallback_file:
+                try:
+                    self.fallback_file.write(data)
+                    self.fallback_file.flush()
+                except Exception:
+                    pass
+
+        def flush(self):
+            if self.stream:
+                try:
+                    self.stream.flush()
+                except Exception:
+                    pass
+            if self.fallback_file:
+                try:
+                    self.fallback_file.flush()
+                except Exception:
+                    pass
+
+        def isatty(self):
+            return False
+
+    fallback_log = None
+    log_dir = os.environ.get("AETHER_LOG_DIR")
+    if log_dir:
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            fallback_log = open(os.path.join(log_dir, "backend_python.log"), "a", encoding="utf-8", buffering=1)
+        except Exception:
+            pass
+
+    if sys.stdout is None or not hasattr(sys.stdout, "write"):
+        sys.stdout = SafeStream(None, fallback_log)
+    else:
+        sys.stdout = SafeStream(sys.stdout, fallback_log)
+
+    if sys.stderr is None or not hasattr(sys.stderr, "write"):
+        sys.stderr = SafeStream(None, fallback_log)
+    else:
+        sys.stderr = SafeStream(sys.stderr, fallback_log)
+
     if "--check" in sys.argv:
         sys.exit(run_check())
+
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=5130)
+    # log_config=None mencegah crash saat dijalankan tanpa console / stream yang di-redirect
+    uvicorn.run(app, host="127.0.0.1", port=5130, log_config=None)

@@ -10,6 +10,42 @@ const APP_URL = process.env.NOTERRA_DEMO_MODE === "1" ? `${URL}?mock=1` : URL;
 
 let backend = null;
 let mainWindow = null;
+const backendLogs = [];
+
+function getBackendLogPath() {
+  const logDir = path.join(app.getPath("userData"), "logs");
+  if (!fs.existsSync(logDir)) {
+    try {
+      fs.mkdirSync(logDir, { recursive: true });
+    } catch (_) {}
+  }
+  return path.join(logDir, "backend.log");
+}
+
+function recordBackendLog(source, rawData) {
+  const text = rawData ? rawData.toString() : "";
+  const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const timestamp = new Date().toISOString();
+  const logFile = getBackendLogPath();
+
+  for (const line of lines) {
+    const entry = `[${timestamp}] [${source}] ${line}`;
+    backendLogs.push(entry);
+    if (backendLogs.length > 200) {
+      backendLogs.shift();
+    }
+    try {
+      fs.appendFileSync(logFile, entry + "\n", "utf8");
+    } catch (_) {}
+  }
+}
+
+function getRecentErrorSnippet() {
+  const errorLogs = backendLogs.filter(l => l.includes("[STDERR]") || l.includes("[ERROR]"));
+  const target = errorLogs.length > 0 ? errorLogs : backendLogs;
+  if (target.length === 0) return "(tidak ada output error tercatat dari proses backend)";
+  return target.slice(-15).join("\n");
+}
 
 ipcMain.on("noterra:set-hud-mode", (event, enabled) => {
   if (!mainWindow || event.sender !== mainWindow.webContents) return;
@@ -106,11 +142,24 @@ function startBackend(root) {
     windowsHide: true
   });
 
-  backend.stdout.on("data", (data) => console.log(`[Aether OS backend] ${data.toString().trimEnd()}`));
-  backend.stderr.on("data", data => console.error(`[Aether OS backend] ${data.toString().trimEnd()}`));
-  backend.on("error", error => console.error("Gagal menjalankan Python backend:", error));
+  recordBackendLog("SYSTEM", `Menjalankan backend: ${command} ${args.join(" ")}`);
+
+  backend.stdout.on("data", (data) => {
+    console.log(`[Aether OS backend] ${data.toString().trimEnd()}`);
+    recordBackendLog("STDOUT", data);
+  });
+  backend.stderr.on("data", (data) => {
+    console.error(`[Aether OS backend] ${data.toString().trimEnd()}`);
+    recordBackendLog("STDERR", data);
+  });
+  backend.on("error", (error) => {
+    console.error("Gagal menjalankan Python backend:", error);
+    recordBackendLog("ERROR", error.stack || error.message);
+  });
   backend.on("exit", (code, signal) => {
-    console.log(`Aether OS backend berhenti (code=${code}, signal=${signal}).`);
+    const exitMsg = `Aether OS backend berhenti (code=${code}, signal=${signal}).`;
+    console.log(exitMsg);
+    recordBackendLog("SYSTEM", exitMsg);
     backend = null;
   });
   return backend;
@@ -130,9 +179,16 @@ function waitForBackend(child, timeoutMs = 30000) {
       child.removeListener("exit", onExit);
       error ? reject(error) : resolve();
     };
-    const onError = error => finish(error);
-    const onExit = (code, signal) =>
-      finish(new Error(`Backend berhenti sebelum siap (code=${code}, signal=${signal}).`));
+    const onError = (error) => {
+      const logFile = getBackendLogPath();
+      const snippet = getRecentErrorSnippet();
+      finish(new Error(`Gagal menjalankan proses backend:\n${error.message}\n\nPesan Error Terakhir:\n${snippet}\n\nLog lengkap tersimpan di:\n${logFile}`));
+    };
+    const onExit = (code, signal) => {
+      const logFile = getBackendLogPath();
+      const snippet = getRecentErrorSnippet();
+      finish(new Error(`Backend berhenti sebelum siap (code=${code}, signal=${signal}).\n\nPesan Error Terakhir:\n${snippet}\n\nLog lengkap tersimpan di:\n${logFile}`));
+    };
 
     child.once("error", onError);
     child.once("exit", onExit);
@@ -153,7 +209,9 @@ function waitForBackend(child, timeoutMs = 30000) {
     const retry = () => {
       if (settled) return;
       if (Date.now() - started >= timeoutMs) {
-        finish(new Error(`Backend tidak siap setelah ${timeoutMs / 1000} detik.`));
+        const logFile = getBackendLogPath();
+        const snippet = getRecentErrorSnippet();
+        finish(new Error(`Backend tidak siap setelah ${timeoutMs / 1000} detik.\n\nPesan Error Terakhir:\n${snippet}\n\nLog lengkap tersimpan di:\n${logFile}`));
         return;
       }
       timer = setTimeout(probe, 300);
